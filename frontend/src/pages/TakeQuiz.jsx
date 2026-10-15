@@ -521,15 +521,13 @@ const TakeQuiz = ({ user }) => {
       isClosedError ||
       submissionResult ||
       isSubmitting ||
-      isSessionLocked ||
-      !isFullscreenModeRef.current ||
-      Date.now() < fullscreenGraceRef.current
+      isSessionLocked
     ) {
       return;
     }
 
     const now = Date.now();
-    // Debounce to prevent multiple triggers from blur + visibilitychange in rapid succession
+    // Debounce to prevent multiple triggers in rapid succession (minimum 600ms)
     if (now - lastViolationTimeRef.current < 600) return;
     lastViolationTimeRef.current = now;
 
@@ -604,9 +602,8 @@ const TakeQuiz = ({ user }) => {
   useEffect(() => {
     if (loading || accessRequired || isClosedError || submissionResult || isSubmitting || isSessionLocked) return;
 
-    // Standard W3C Page Visibility API (Fires ONLY when tab is hidden or minimized)
+    // Standard W3C Page Visibility API (Fires when tab is hidden or minimized)
     const handleVisibilityChange = () => {
-      if (!isFullscreenModeRef.current || Date.now() < fullscreenGraceRef.current) return;
       if (document.hidden) {
         applyImmediateBlackout(true);
         setIsFocusLost(true);
@@ -621,9 +618,10 @@ const TakeQuiz = ({ user }) => {
       }
     };
 
-    // Standard Window Blur (Fires ONLY when browser window loses focus to an external app)
+    // Standard Window Blur (Fires when browser window loses focus to an external app)
     const handleWindowBlur = () => {
-      if (!isFullscreenModeRef.current || Date.now() < fullscreenGraceRef.current) return;
+      // Small 600ms grace window after user initiates fullscreen to let browser repaint
+      if (Date.now() < fullscreenGraceRef.current) return;
       applyImmediateBlackout(true);
       setIsFocusLost(true);
       if (!hasLeftWindowRef.current) {
@@ -640,7 +638,6 @@ const TakeQuiz = ({ user }) => {
 
     // Mobile / iOS Safari App Switch & Tab Departure Guard (Guaranteed to fire on iOS app switch)
     const handlePageHide = () => {
-      if (!isFullscreenModeRef.current || Date.now() < fullscreenGraceRef.current) return;
       applyImmediateBlackout(true);
       setIsFocusLost(true);
       if (!hasLeftWindowRef.current) {
@@ -651,7 +648,6 @@ const TakeQuiz = ({ user }) => {
 
     // iOS Safari BFCache & App-Return Resumption Guard
     const handlePageShow = (e) => {
-      if (!isFullscreenModeRef.current || Date.now() < fullscreenGraceRef.current) return;
       if (e.persisted || hasLeftWindowRef.current) {
         hasLeftWindowRef.current = false;
         applyImmediateBlackout(false);
@@ -743,12 +739,22 @@ const TakeQuiz = ({ user }) => {
   }, [loading, accessRequired, isClosedError, notStartedData, submissionResult, isSubmitting, isSessionLocked, proctoringRules, quizId, applyImmediateBlackout]);
 
   // 3a. Unconditional Right-Click & Context-Menu Lockdown (Ironclad & Omnipresent)
-  // Blocks context menu, right mousedown/mouseup, auxclick, and pointer events unconditionally
-  // on window, document, documentElement, and body, with direct property assignments.
   useEffect(() => {
-    const blockEvent = (e) => {
-      // Check for right-click: contextmenu event, button 2 (right), which 3, or Ctrl+Click on macOS
-      if (e.type === 'contextmenu' || e.button === 2 || e.which === 3 || (e.ctrlKey && e.button === 0)) {
+    window.__QUIZX_LOCKDOWN__ = true;
+    if (document.body) {
+      document.body.classList.add('quizx-exam-lockdown');
+    }
+
+    const blockContextMenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      return false;
+    };
+
+    const blockMouseButtons = (e) => {
+      // button 2 = right click, which 3 = right click, ctrlKey + click on Mac
+      if (e.button === 2 || e.which === 3 || (e.ctrlKey && e.button === 0)) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -758,21 +764,27 @@ const TakeQuiz = ({ user }) => {
 
     // Direct property assignment for instant native engine interception
     try {
-      window.oncontextmenu = (e) => { e?.preventDefault?.(); return false; };
-      document.oncontextmenu = (e) => { e?.preventDefault?.(); return false; };
+      window.oncontextmenu = blockContextMenu;
+      document.oncontextmenu = blockContextMenu;
       if (document.body) {
-        document.body.oncontextmenu = (e) => { e?.preventDefault?.(); return false; };
+        document.body.oncontextmenu = blockContextMenu;
       }
       if (document.documentElement) {
-        document.documentElement.oncontextmenu = (e) => { e?.preventDefault?.(); return false; };
+        document.documentElement.oncontextmenu = blockContextMenu;
       }
     } catch (_) {}
 
     // High-priority capturing event listeners on all DOM levels
     const targets = [window, document, document.documentElement, document.body].filter(Boolean);
-    const eventTypes = ["contextmenu", "mousedown", "mouseup", "pointerdown", "pointerup", "auxclick"];
+    const mouseEvents = ["mousedown", "mouseup", "pointerdown", "pointerup", "auxclick"];
 
-    // Shield against mobile long-press selection & native search callouts (Google Lens / iOS Look Up)
+    targets.forEach((target) => {
+      target.addEventListener("contextmenu", blockContextMenu, { capture: true, passive: false });
+      mouseEvents.forEach((evt) => {
+        target.addEventListener(evt, blockMouseButtons, { capture: true, passive: false });
+      });
+    });
+
     const blockSelectStart = (e) => {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
         return true;
@@ -781,106 +793,116 @@ const TakeQuiz = ({ user }) => {
       return false;
     };
 
-    // Shield against multi-finger pinch zooming to bypass mobile viewport lock
     const blockGestureZoom = (e) => {
       if (e.touches && e.touches.length > 1) {
         e.preventDefault();
       }
     };
 
-    targets.forEach((target) => {
-      eventTypes.forEach((evt) => {
-        target.addEventListener(evt, blockEvent, { capture: true, passive: false });
-      });
-    });
-
     document.addEventListener("selectstart", blockSelectStart, { capture: true, passive: false });
     document.addEventListener("touchstart", blockGestureZoom, { passive: false });
 
     return () => {
-      try {
-        window.oncontextmenu = null;
-        document.oncontextmenu = null;
-        if (document.body) document.body.oncontextmenu = null;
-        if (document.documentElement) document.documentElement.oncontextmenu = null;
-      } catch (_) {}
+      window.__QUIZX_LOCKDOWN__ = false;
+      if (document.body) {
+        document.body.classList.remove('quizx-exam-lockdown');
+        document.body.oncontextmenu = null;
+      }
+      window.oncontextmenu = null;
+      document.oncontextmenu = null;
+      if (document.documentElement) document.documentElement.oncontextmenu = null;
 
       targets.forEach((target) => {
-        eventTypes.forEach((evt) => {
-          target.removeEventListener(evt, blockEvent, { capture: true });
+        target.removeEventListener("contextmenu", blockContextMenu, { capture: true });
+        mouseEvents.forEach((evt) => {
+          target.removeEventListener(evt, blockMouseButtons, { capture: true });
         });
       });
 
       document.removeEventListener("selectstart", blockSelectStart, { capture: true });
       document.removeEventListener("touchstart", blockGestureZoom);
     };
-  }, []); // Empty deps = runs once on mount, permanently active throughout quiz lifecycle
+  }, []);
 
-  // 3b. Keyboard & DevTools Lockdown (state-dependent)
+  // 3b. Ironclad Keyboard & Shortcut Lockdown (Capturing Phase Interception)
   useEffect(() => {
-    if (loading || accessRequired || submissionResult || isSessionLocked) return;
+    if (submissionResult || isSessionLocked) return;
 
-    // Suppress Context Menu Keyboard Keys and DevTools Shortcuts
     const handleKeyDown = (e) => {
-      const isPrintScreen = e.key === "PrintScreen" || e.code === "PrintScreen" || e.keyCode === 44;
-      const isContextMenuKey = e.key === "ContextMenu" || (e.shiftKey && (e.key === "F10" || e.keyCode === 121));
-      const isDevToolsOrSource =
-        e.key === "F12" ||
-        ((e.ctrlKey || e.metaKey) && e.shiftKey && ["i", "j", "c", "k"].includes(e.key.toLowerCase())) ||
-        ((e.ctrlKey || e.metaKey) && ["u", "s", "p"].includes(e.key.toLowerCase()));
+      // 1. Function Keys (F1 through F12)
+      const isFunctionKey = /^F([1-9]|1[0-2])$/i.test(e.key) || (e.keyCode >= 112 && e.keyCode <= 123);
 
-      if (isPrintScreen || isContextMenuKey || isDevToolsOrSource) {
+      // 2. Any Ctrl or Meta (Command/Windows) combination
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+
+      // 3. Any Alt combination (Alt+Tab, Alt+F4, Alt+Left/Right, etc.)
+      const isAlt = e.altKey;
+
+      // 4. PrintScreen / Screenshot key
+      const isPrintScreen = e.key === "PrintScreen" || e.code === "PrintScreen" || e.keyCode === 44;
+
+      // 5. ContextMenu key or Shift+F10
+      const isContextMenuKey = e.key === "ContextMenu" || (e.shiftKey && (e.key === "F10" || e.keyCode === 121));
+
+      // 6. Escape key
+      const isEscape = e.key === "Escape" || e.keyCode === 27;
+
+      if (isPrintScreen) {
         e.preventDefault();
-        if (isPrintScreen) {
-          applyImmediateBlackout(true);
-          setIsFocusLost(true);
-          try {
-            if (navigator.clipboard?.writeText) {
-              navigator.clipboard.writeText("CONFIDENTIAL EXAMINATION - SCREEN CAPTURE FORBIDDEN");
-            }
-          } catch (_) {}
-          if (proctoringRules.preventScreenshots) {
-            recordFocusViolation("Screenshot attempt intercepted");
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        applyImmediateBlackout(true);
+        setIsFocusLost(true);
+        try {
+          if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText("CONFIDENTIAL EXAMINATION - SCREEN CAPTURE FORBIDDEN");
           }
+        } catch (_) {}
+        if (proctoringRules.preventScreenshots) {
+          recordFocusViolation("Screenshot attempt intercepted");
         }
         return false;
       }
 
-      // Clipboard shortcuts (Copy / Cut / Paste) if clipboard disabled
-      if (proctoringRules.disableClipboard !== false) {
-        if ((e.ctrlKey || e.metaKey) && ["c", "v", "x", "a"].includes(e.key.toLowerCase())) {
-          e.preventDefault();
-          return false;
-        }
+      if (isFunctionKey || isCtrlOrMeta || isAlt || isContextMenuKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+
+      if (isEscape) {
+        e.preventDefault();
+        e.stopPropagation();
       }
     };
 
     const handleCopyPaste = (e) => {
-      if (proctoringRules.disableClipboard !== false) {
-        e.preventDefault();
-        return false;
-      }
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      return false;
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("copy", handleCopyPaste);
-    window.addEventListener("cut", handleCopyPaste);
-    window.addEventListener("paste", handleCopyPaste);
+    window.addEventListener("keydown", handleKeyDown, { capture: true, passive: false });
+    document.addEventListener("keydown", handleKeyDown, { capture: true, passive: false });
+    window.addEventListener("copy", handleCopyPaste, { capture: true, passive: false });
+    window.addEventListener("cut", handleCopyPaste, { capture: true, passive: false });
+    window.addEventListener("paste", handleCopyPaste, { capture: true, passive: false });
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("copy", handleCopyPaste);
-      window.removeEventListener("cut", handleCopyPaste);
-      window.removeEventListener("paste", handleCopyPaste);
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
+      document.removeEventListener("keydown", handleKeyDown, { capture: true });
+      window.removeEventListener("copy", handleCopyPaste, { capture: true });
+      window.removeEventListener("cut", handleCopyPaste, { capture: true });
+      window.removeEventListener("paste", handleCopyPaste, { capture: true });
     };
-  }, [loading, accessRequired, submissionResult, isSessionLocked, proctoringRules, applyImmediateBlackout]);
+  }, [submissionResult, isSessionLocked, proctoringRules, applyImmediateBlackout]);
 
   // 4. Fullscreen Enforcer & Exit Violation (Full iOS Safari Kiosk & Desktop/Android Compatibility)
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (isIOSDevice()) {
-        // iOS Safari does not support document.fullscreenElement for HTML elements.
-        // In iOS Kiosk mode, full-window coverage is maintained and governed by visibility/pagehide/blur.
         return;
       }
 
@@ -895,23 +917,22 @@ const TakeQuiz = ({ user }) => {
 
       if (isFull) {
         wasInFullscreenRef.current = true;
-        fullscreenGraceRef.current = Date.now() + 3500;
+        fullscreenGraceRef.current = Date.now() + 600;
         hasLeftWindowRef.current = false;
         applyImmediateBlackout(false);
         setIsFocusLost(false);
         try {
           window.focus();
           document.body?.focus?.();
+          if (navigator.keyboard && navigator.keyboard.lock) {
+            navigator.keyboard.lock(['Escape']).catch(() => {});
+          }
         } catch (_) {}
       } else {
-        const wasInFull = wasInFullscreenRef.current;
         wasInFullscreenRef.current = false;
 
-        // ONLY trigger exit infraction if candidate was actually inside fullscreen
-        // and we are NOT within the initial fullscreen transition grace period
+        // Trigger exit infraction whenever candidate exits fullscreen during active assessment
         if (
-          wasInFull &&
-          Date.now() >= fullscreenGraceRef.current &&
           proctoringRules.enforceFullscreen &&
           !loading &&
           !accessRequired &&
@@ -919,43 +940,9 @@ const TakeQuiz = ({ user }) => {
           !isSessionLocked &&
           !isSubmitting
         ) {
-          violationsRef.current += 1;
-          const count = violationsRef.current;
-          setTabViolations(count);
-          try {
-            localStorage.setItem(`quizx_violations_${quizId}`, String(count));
-          } catch (e) { }
-
-          api.post(`/quizzes/${quizId}/record-violation`, {
-            violationCount: count,
-            reason: 'Exited fullscreen mode'
-          }).then((vRes) => {
-            if (vRes.data?.isLocked) {
-              setIsSessionLocked(true);
-              setShowViolationWarning(false);
-              applyImmediateBlackout(false);
-            }
-          }).catch((err) => {
-            if (err.response?.data?.isLocked || err.response?.status === 403) {
-              setIsSessionLocked(true);
-              setShowViolationWarning(false);
-              applyImmediateBlackout(false);
-            }
-          });
-
-          const threshold = proctoringRules.maxTabSwitches || 3;
-          if (count >= threshold) {
-            if (proctoringRules.violationAction === 'AUTO_LOCK') {
-              api.post(`/quizzes/${quizId}/lock-attempt`, { violationsCount: count, reason: 'Exited fullscreen mode' }).catch(() => { });
-              setIsSessionLocked(true);
-              setShowViolationWarning(false);
-              applyImmediateBlackout(false);
-            } else {
-              handleSubmit(true);
-            }
-          } else {
-            setShowViolationWarning(true);
-          }
+          applyImmediateBlackout(true);
+          setIsFocusLost(true);
+          recordFocusViolation('Exited fullscreen mode');
         }
       }
     };
@@ -1970,17 +1957,17 @@ const TakeQuiz = ({ user }) => {
 
         {/* Live Status Indicators: Clock, Warnings, and Submit */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Live Integrity Warning Counter Badge */}
+          {/* Live Integrity Status Badge */}
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-black transition-all ${
               tabViolations > 0
                 ? 'bg-rose-50 text-rose-700 border-rose-300 animate-pulse'
                 : 'bg-slate-50 text-slate-500 border-slate-200'
             }`}
-            title="Proctoring integrity counter: tracks window blur, tab switches, and mobile app switching"
+            title="Real-time proctoring integrity active"
           >
             <ShieldAlert size={14} className={tabViolations > 0 ? 'text-rose-600' : 'text-slate-400'} />
-            <span>{tabViolations} / {proctoringRules.maxTabSwitches || 3} Warnings</span>
+            <span>{tabViolations > 0 ? 'Proctoring Flagged' : 'AI Proctored'}</span>
           </div>
 
           {quiz.timingMode === 'STRICT' && (
@@ -2537,31 +2524,51 @@ const TakeQuiz = ({ user }) => {
                 Academic Integrity Alert
               </h3>
               <p className="text-xs text-rose-600 font-extrabold">
-                Window or Tab Focus Loss Detected
+                Window Focus Loss / Full-Screen Exit Detected
               </p>
             </div>
-            <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl text-xs text-rose-900 leading-relaxed space-y-1.5">
+            <div className="p-4 bg-rose-50/80 border border-rose-200 rounded-xl text-xs text-rose-900 leading-relaxed space-y-2">
               <p className="font-bold">
-                Violation {tabViolations} of {proctoringRules.maxTabSwitches || 3}: Examination guidelines require you to maintain uninterrupted active focus on this assessment window.
+                Examination guidelines strictly require continuous, uninterrupted active focus in full-screen mode at all times.
               </p>
-              <p className="text-rose-700 text-[11px]">
-                {proctoringRules.violationAction === 'AUTO_LOCK'
-                  ? `Upon reaching ${proctoringRules.maxTabSwitches || 3} violations, your assessment session will be immediately FROZEN & LOCKED.`
-                  : `Upon reaching ${proctoringRules.maxTabSwitches || 3} violations, your assessment will be immediately TERMINATED & AUTO-SUBMITTED.`}
+              <p className="text-rose-700 text-[11px] leading-relaxed">
+                Your activity has been officially logged with an encrypted timestamp on the institutional examination server. Any further tab switching, window minimization, or exiting full-screen will result in immediate examination session lock-out.
               </p>
             </div>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 setShowViolationWarning(false);
-                fullscreenGraceRef.current = Date.now() + 2000;
                 hasLeftWindowRef.current = false;
                 applyImmediateBlackout(false);
                 setIsFocusLost(false);
+
                 try {
+                  fullscreenGraceRef.current = Date.now() + 600;
+                  if (!document.fullscreenElement) {
+                    if (document.documentElement.requestFullscreen) {
+                      await document.documentElement.requestFullscreen();
+                    } else if (document.documentElement.webkitRequestFullscreen) {
+                      await document.documentElement.webkitRequestFullscreen();
+                    } else if (document.documentElement.mozRequestFullScreen) {
+                      await document.documentElement.mozRequestFullScreen();
+                    } else if (document.documentElement.msRequestFullscreen) {
+                      await document.documentElement.msRequestFullscreen();
+                    }
+                  }
+                  setIsFullscreenMode(true);
+                  isFullscreenModeRef.current = true;
+                  wasInFullscreenRef.current = true;
+                  if (navigator.keyboard && navigator.keyboard.lock) {
+                    navigator.keyboard.lock(['Escape']).catch(() => {});
+                  }
                   window.focus();
                   document.body?.focus?.();
-                } catch (_) {}
+                } catch (_) {
+                  setIsFullscreenMode(true);
+                  isFullscreenModeRef.current = true;
+                  wasInFullscreenRef.current = true;
+                }
               }}
               className="w-full py-2.5 rounded-xl bg-[#1c1f58] hover:bg-[#131540] text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
             >

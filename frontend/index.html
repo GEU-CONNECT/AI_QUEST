@@ -16,8 +16,9 @@
       (function() {
         function blockEvent(e) {
           if (e.type === 'contextmenu' || e.button === 2 || e.which === 3 || (e.ctrlKey && e.button === 0)) {
-            // Allow normal right click on auth/landing page, but lockdown inside exam
-            if (window.location.pathname.includes('/take')) {
+            var path = (window.location && window.location.pathname) || '';
+            var isExam = path.includes('/take') || path.includes('/quiz') || window.__QUIZX_LOCKDOWN__ || document.body?.classList?.contains('quizx-exam-lockdown');
+            if (isExam) {
               e.preventDefault();
               e.stopPropagation();
               e.stopImmediatePropagation();
