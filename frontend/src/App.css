@@ -24,9 +24,7 @@
 .global-navbar {
   width: 100%;
   padding: 14px 28px;
-  background: rgba(7, 14, 44, 0.78);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: #070e2c;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   position: sticky;
   top: 0;
@@ -393,74 +391,40 @@
   position: relative;
 }
 
+.form-static-stage,
 .form-3d-perspective-stage {
   position: relative;
-  perspective: 1400px;
   width: 100%;
 }
 
-/* Ambient Backdrop Glows for Supreme Form Visibility */
-.form-ambient-aura-left {
-  position: absolute;
-  top: 10%;
-  left: -80px;
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.35) 0%, rgba(37, 99, 235, 0) 70%);
-  pointer-events: none;
-  filter: blur(45px);
-  z-index: 1;
-}
-
-.form-ambient-aura-right {
-  position: absolute;
-  bottom: 15%;
-  right: -80px;
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, rgba(234, 179, 8, 0.28) 0%, rgba(234, 179, 8, 0) 70%);
-  pointer-events: none;
-  filter: blur(45px);
-  z-index: 1;
-}
-
-/* 3D Tilted Interactive Card with Ultra-High Visibility */
+/* Static Ultra-Smooth High Visibility Card */
+.static-form-card,
 .interactive-3d-card {
   position: relative;
   z-index: 10;
-  transform-style: preserve-3d;
-  transition: transform 0.12s ease-out, box-shadow 0.25s ease;
-  will-change: transform;
   border-radius: 28px;
-  background: linear-gradient(168deg, rgba(14, 28, 82, 0.95) 0%, rgba(8, 17, 54, 0.98) 50%, rgba(10, 22, 66, 0.96) 100%);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: linear-gradient(168deg, #0e1e55 0%, #091338 50%, #060d28 100%);
   border: 1.5px solid rgba(250, 204, 21, 0.45);
   padding: 42px 46px;
   box-shadow: 
-    0 35px 90px -15px rgba(0, 0, 0, 0.88),
-    0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 0 70px rgba(37, 99, 235, 0.28),
-    0 0 45px rgba(250, 204, 21, 0.18);
+    0 25px 60px -10px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 40px rgba(37, 99, 235, 0.2);
   overflow: visible;
 }
 
 @media (max-width: 640px) {
+  .static-form-card,
   .interactive-3d-card {
     padding: 24px 18px;
     border-radius: 20px;
   }
 }
 
-/* Dynamic Specular Glare */
-.card-specular-glare {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: 28px;
-  z-index: 25;
-  mix-blend-mode: screen;
-  transition: background 0.08s ease-out;
+.card-specular-glare,
+.form-ambient-aura-left,
+.form-ambient-aura-right {
+  display: none !important;
 }
 
 /* 3D Layers */
@@ -2564,9 +2528,9 @@
 }
 
 /* ============================================================
-   LITE / SMOOTH MODE (Zero GPU & CPU Lag for Old PCs & Monitors)
+   PERMANENT STATIC HIGH-PERFORMANCE BACKDROP (0% CPU / 0% GPU)
    ============================================================ */
-.lite-mode-backdrop {
+.static-page-backdrop {
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -2574,85 +2538,44 @@
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 15%, #122878 0%, #0a174a 45%, #050b24 100%);
+  background: radial-gradient(circle at 50% 15%, #10246a 0%, #091542 45%, #050b24 100%);
 }
 
-.lite-space-gradient {
+.static-space-gradient {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 30%, rgba(37, 99, 235, 0.15) 0%, transparent 60%);
+}
+
+.static-subtle-grid {
   position: absolute;
   inset: 0;
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 50px 50px;
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
   background-position: center center;
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
-.lite-ambient-circle {
+.static-ambient-circle {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
 }
 
-.lite-circle-1 {
-  top: -120px;
-  left: 15%;
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.22) 0%, transparent 70%);
+.circle-top-left {
+  top: -100px;
+  left: 10%;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.2) 0%, transparent 70%);
 }
 
-.lite-circle-2 {
+.circle-bottom-right {
   bottom: 5%;
-  right: 15%;
-  width: 480px;
-  height: 480px;
-  background: radial-gradient(circle, rgba(234, 179, 8, 0.15) 0%, transparent 70%);
-}
-
-/* Global Lite Mode Overrides: eliminate backdrop-filters, blurs, and heavy shadows */
-body.lite-mode,
-.lite-mode {
-  image-rendering: -webkit-optimize-contrast;
-}
-
-body.lite-mode .global-navbar,
-.lite-mode .global-navbar {
-  background: #070e2c !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-body.lite-mode .interactive-3d-card,
-.lite-mode .interactive-3d-card {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  background: #091338 !important;
-  transform: none !important;
-  will-change: auto !important;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(250, 204, 21, 0.3) !important;
-}
-
-body.lite-mode .form-ambient-aura-left,
-body.lite-mode .form-ambient-aura-right,
-.lite-mode .form-ambient-aura-left,
-.lite-mode .form-ambient-aura-right {
-  display: none !important;
-}
-
-body.lite-mode .card-specular-glare,
-.lite-mode .card-specular-glare {
-  display: none !important;
-}
-
-body.lite-mode .modal-backdrop-blur,
-.lite-mode .modal-backdrop-blur {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  background: rgba(3, 7, 24, 0.95) !important;
-}
-
-body.lite-mode *,
-.lite-mode * {
-  text-shadow: none !important;
+  right: 10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(234, 179, 8, 0.12) 0%, transparent 70%);
 }

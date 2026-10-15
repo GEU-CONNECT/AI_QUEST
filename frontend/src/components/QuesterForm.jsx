@@ -99,9 +99,8 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false);
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
 
-  // 3D Tilt & Performance State
+  // Static Performance State
   const cardRef = useRef(null);
-  const glareRef = useRef(null);
   const section1Ref = useRef(null);
   const section2Ref = useRef(null);
   const section3Ref = useRef(null);
@@ -168,43 +167,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
     trigger3DPulse(0.8);
   };
 
-  const handleCardMouseMove = (e) => {
-    // If Smooth/Lite mode is active, completely skip mouse tilt calculations
-    if (document.body.classList.contains('lite-mode')) return;
-    if (!cardRef.current) return;
 
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    const rx = ((y - centerY) / centerY) * -4.5;
-    const ry = ((x - centerX) / centerX) * 4.5;
-
-    const gx = (x / rect.width) * 100;
-    const gy = (y / rect.height) * 100;
-
-    // Apply directly to DOM inside requestAnimationFrame - NO React re-renders!
-    requestAnimationFrame(() => {
-      if (cardRef.current) {
-        cardRef.current.style.transform = `perspective(1200px) rotateX(${rx}deg) rotateY(${ry}deg)`;
-      }
-      if (glareRef.current) {
-        glareRef.current.style.background = `radial-gradient(circle at ${gx}% ${gy}%, rgba(255, 255, 255, 0.15) 0%, rgba(250, 204, 21, 0.05) 40%, transparent 70%)`;
-      }
-    });
-  };
-
-  const handleCardMouseLeave = () => {
-    if (cardRef.current) {
-      cardRef.current.style.transform = 'perspective(1200px) rotateX(0deg) rotateY(0deg)';
-    }
-    if (glareRef.current) {
-      glareRef.current.style.background = 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, rgba(250, 204, 21, 0.05) 40%, transparent 70%)';
-    }
-  };
 
   // Section Validation & Completeness checks
   const isCandidateNameValid = Boolean(formData.candidateName && formData.candidateName.trim().length >= 3);
@@ -238,10 +201,8 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
   const totalFields = 9;
   const progressPercent = Math.round((validFieldsCount / totalFields) * 100);
 
-  // Trigger 3D Three.js canvas pulse
-  const trigger3DPulse = (intensity = 0.6) => {
-    window.dispatchEvent(new CustomEvent('ai-quest-activity', { detail: { intensity } }));
-  };
+  // Static mode (zero overhead)
+  const trigger3DPulse = () => {};
 
   // Field change handler
   const handleChange = (e) => {
@@ -418,23 +379,12 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
   };
 
   return (
-    <div className="form-3d-perspective-stage">
-      {/* Ambient Backdrop Aura to make form stand out */}
-      <div className="form-ambient-aura-left"></div>
-      <div className="form-ambient-aura-right"></div>
-
-      {/* Main 3D Tilted Card */}
+    <div className="form-static-stage">
+      {/* Main Solid Form Card */}
       <div
         ref={cardRef}
-        onMouseMove={handleCardMouseMove}
-        onMouseLeave={handleCardMouseLeave}
-        className="form-card-container interactive-3d-card"
+        className="form-card-container static-form-card"
       >
-        {/* Dynamic Specular Glare Layer */}
-        <div
-          ref={glareRef}
-          className="card-specular-glare"
-        ></div>
 
         {/* Top Header Strip */}
         <div className="form-card-header layer-3d-front">

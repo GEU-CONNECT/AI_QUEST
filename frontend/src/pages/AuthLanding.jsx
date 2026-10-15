@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThreeCanvas from '../components/ThreeCanvas';
 import Navbar from '../components/Navbar';
@@ -8,17 +8,12 @@ import SuccessModal from '../components/SuccessModal';
 import { AIQuestLogo, GraphicEraLogo } from '../components/BrandingAssets';
 import { LogIn, UserPlus, AlertCircle } from 'lucide-react';
 import { sound } from '../utils/audio';
-import { initPerformanceMode } from '../utils/performance';
 import api from '../api/client';
 import '../App.css';
 
 export default function AuthLanding({ onLoginSuccess }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('register'); // 'register' | 'login'
-
-  useEffect(() => {
-    initPerformanceMode();
-  }, []);
 
   const [formData, setFormData] = useState({
     candidateName: '',
