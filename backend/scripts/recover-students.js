@@ -133,6 +133,11 @@ async function main() {
   console.log('🔍 [AI QUEST] Deep Candidate Recovery & Protection');
   console.log('====================================================');
 
+  if (process.env.ALLOW_STUDENT_RESTORE !== 'true') {
+    console.log('ℹ️ [AI QUEST] Candidate auto-recovery is DISABLED. Skipping to protect clean database state.');
+    return { skipped: true, reason: 'Candidate auto-recovery disabled' };
+  }
+
   const report = {
     startedAt: new Date().toISOString(),
     drBackupDetails: null,

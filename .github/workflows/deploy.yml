@@ -79,10 +79,6 @@ jobs:
           fi
           nice -n 19 npx prisma generate
 
-          # 5. Run Candidate Recovery & Protection Script
-          echo "🔍 Running Candidate Recovery across all backups, logs, and carvings..."
-          nice -n 19 node scripts/recover-students.js || true
-
           # 5b. Sync Super Admin Credentials into Live Database
           echo "👑 Syncing Super Admin credentials into live database..."
           nice -n 19 node scripts/sync-super-admin.js || true
