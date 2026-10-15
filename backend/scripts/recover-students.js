@@ -174,6 +174,17 @@ async function main() {
     }
   }
 
+  // System Audit: Discover all PM2 apps, databases, other projects
+  report.systemAudit = {
+    homeDirs: runCmd("ls -la /home/ubuntu 2>/dev/null || true").split('\n').filter(Boolean),
+    pm2Processes: runCmd("pm2 jlist 2>/dev/null || true"),
+    nginxSites: runCmd("grep -rnE 'server_name|proxy_pass' /etc/nginx/sites-enabled/ 2>/dev/null || true").split('\n').filter(Boolean),
+    envDbUrls: runCmd("grep -rnE 'DATABASE_URL|DB_NAME|MONGODB|POSTGRES|MYSQL' /home/ubuntu/*/.env /tmp/dr_extracted/* 2>/dev/null || true").split('\n').filter(Boolean),
+    allDbFiles: runCmd("find /home/ubuntu -name '*.db' -o -name '*.sqlite*' -o -name '*.sql' 2>/dev/null || true").split('\n').filter(Boolean),
+    mysqlStatus: runCmd("systemctl is-active mysql 2>/dev/null || true"),
+    postgresStatus: runCmd("systemctl is-active postgresql 2>/dev/null || true")
+  };
+
   // 2. Discover ALL candidate database files across filesystem
   const searchDirs = [
     '/home/ubuntu/.db_backups',
