@@ -1084,28 +1084,50 @@ const TakeQuiz = ({ user }) => {
     };
   }, []);
 
-  // 3b. Ironclad Keyboard & Shortcut Lockdown (Capturing Phase Interception)
+  // 3b. Ironclad Keyboard & Shortcut Lockdown (Windows Key & All System Keys Blocked)
   useEffect(() => {
     if (submissionResult || isSessionLocked) return;
 
     const handleKeyDown = (e) => {
-      // 1. Function Keys (F1 through F12)
+      // 1. Windows Key / Meta Key (Left or Right) - High priority interception
+      const isWindowsKey = e.key === "Meta" ||
+                           e.key === "OS" ||
+                           e.key === "Win" ||
+                           e.code === "MetaLeft" ||
+                           e.code === "MetaRight" ||
+                           e.code === "OSLeft" ||
+                           e.code === "OSRight" ||
+                           e.keyCode === 91 ||
+                           e.keyCode === 92 ||
+                           e.keyCode === 224;
+
+      // 2. Function Keys (F1 through F12)
       const isFunctionKey = /^F([1-9]|1[0-2])$/i.test(e.key) || (e.keyCode >= 112 && e.keyCode <= 123);
 
-      // 2. Any Ctrl or Meta (Command/Windows) combination
-      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+      // 3. Any Ctrl or Meta (Command/Windows) combination
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey || isWindowsKey;
 
-      // 3. Any Alt combination (Alt+Tab, Alt+F4, Alt+Left/Right, etc.)
+      // 4. Any Alt combination (Alt+Tab, Alt+F4, Alt+Left/Right, etc.)
       const isAlt = e.altKey;
 
-      // 4. PrintScreen / Screenshot key
+      // 5. PrintScreen / Screenshot key
       const isPrintScreen = e.key === "PrintScreen" || e.code === "PrintScreen" || e.keyCode === 44;
 
-      // 5. ContextMenu key or Shift+F10
+      // 6. ContextMenu key or Shift+F10
       const isContextMenuKey = e.key === "ContextMenu" || (e.shiftKey && (e.key === "F10" || e.keyCode === 121));
 
-      // 6. Escape key
+      // 7. Escape key
       const isEscape = e.key === "Escape" || e.keyCode === 27;
+
+      if (isWindowsKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        applyImmediateBlackout(true);
+        setIsFocusLost(true);
+        recordFocusViolation("Windows key / OS Start menu prohibited");
+        return false;
+      }
 
       if (isPrintScreen) {
         e.preventDefault();
@@ -1137,6 +1159,23 @@ const TakeQuiz = ({ user }) => {
       }
     };
 
+    const handleKeyUp = (e) => {
+      const isWindowsKey = e.key === "Meta" ||
+                           e.key === "OS" ||
+                           e.key === "Win" ||
+                           e.code === "MetaLeft" ||
+                           e.code === "MetaRight" ||
+                           e.keyCode === 91 ||
+                           e.keyCode === 92 ||
+                           e.keyCode === 224;
+      if (isWindowsKey || e.key === "ContextMenu" || e.keyCode === 18) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    };
+
     const handleCopyPaste = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -1146,6 +1185,8 @@ const TakeQuiz = ({ user }) => {
 
     window.addEventListener("keydown", handleKeyDown, { capture: true, passive: false });
     document.addEventListener("keydown", handleKeyDown, { capture: true, passive: false });
+    window.addEventListener("keyup", handleKeyUp, { capture: true, passive: false });
+    document.addEventListener("keyup", handleKeyUp, { capture: true, passive: false });
     window.addEventListener("copy", handleCopyPaste, { capture: true, passive: false });
     window.addEventListener("cut", handleCopyPaste, { capture: true, passive: false });
     window.addEventListener("paste", handleCopyPaste, { capture: true, passive: false });
@@ -1153,6 +1194,8 @@ const TakeQuiz = ({ user }) => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       document.removeEventListener("keydown", handleKeyDown, { capture: true });
+      window.removeEventListener("keyup", handleKeyUp, { capture: true });
+      document.removeEventListener("keyup", handleKeyUp, { capture: true });
       window.removeEventListener("copy", handleCopyPaste, { capture: true });
       window.removeEventListener("cut", handleCopyPaste, { capture: true });
       window.removeEventListener("paste", handleCopyPaste, { capture: true });
@@ -1185,7 +1228,9 @@ const TakeQuiz = ({ user }) => {
           window.focus();
           document.body?.focus?.();
           if (navigator.keyboard && navigator.keyboard.lock) {
-            navigator.keyboard.lock(['Escape']).catch(() => {});
+            navigator.keyboard.lock(['Escape', 'MetaLeft', 'MetaRight', 'AltLeft', 'AltRight', 'Tab', 'ContextMenu']).catch(() => {
+              try { navigator.keyboard.lock().catch(() => {}); } catch (_) {}
+            });
           }
         } catch (_) {}
       } else {
@@ -2180,6 +2225,11 @@ const TakeQuiz = ({ user }) => {
                     try {
                       window.focus();
                       document.body?.focus?.();
+                      if (navigator.keyboard && navigator.keyboard.lock) {
+                        navigator.keyboard.lock(['Escape', 'MetaLeft', 'MetaRight', 'AltLeft', 'AltRight', 'Tab', 'ContextMenu']).catch(() => {
+                          try { navigator.keyboard.lock().catch(() => {}); } catch (_) {}
+                        });
+                      }
                     } catch (_) {}
                   }, 100);
                 } catch (err) {
@@ -2818,7 +2868,9 @@ const TakeQuiz = ({ user }) => {
                   isFullscreenModeRef.current = true;
                   wasInFullscreenRef.current = true;
                   if (navigator.keyboard && navigator.keyboard.lock) {
-                    navigator.keyboard.lock(['Escape']).catch(() => {});
+                    navigator.keyboard.lock(['Escape', 'MetaLeft', 'MetaRight', 'AltLeft', 'AltRight', 'Tab', 'ContextMenu']).catch(() => {
+                      try { navigator.keyboard.lock().catch(() => {}); } catch (_) {}
+                    });
                   }
                   window.focus();
                   document.body?.focus?.();

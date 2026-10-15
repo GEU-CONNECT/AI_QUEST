@@ -66,6 +66,24 @@
             origAddEventListener.call(window, evt, blockEvent, true);
             origAddEventListener.call(document, evt, blockEvent, true);
           });
+
+          function blockKeys(e) {
+            var path = (window.location && window.location.pathname) || '';
+            var isExam = path.includes('/take') || path.includes('/quiz') || window.__QUIZX_LOCKDOWN__ || (document.body && document.body.classList && document.body.classList.contains('quizx-exam-lockdown'));
+            if (!isExam) return;
+
+            var isWin = e.key === 'Meta' || e.key === 'OS' || e.key === 'Win' || e.code === 'MetaLeft' || e.code === 'MetaRight' || e.keyCode === 91 || e.keyCode === 92 || e.keyCode === 224 || e.metaKey;
+            if (isWin) {
+              e.preventDefault();
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              return false;
+            }
+          }
+          ['keydown', 'keyup'].forEach(function(evt) {
+            origAddEventListener.call(window, evt, blockKeys, true);
+            origAddEventListener.call(document, evt, blockKeys, true);
+          });
         } catch (_) {}
       })();
     </script>
