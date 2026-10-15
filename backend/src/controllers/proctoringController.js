@@ -4,7 +4,7 @@ const prisma = require('../config/db');
 // @route   POST /api/proctoring/:quizId/violation
 const recordViolation = async (req, res, next) => {
   try {
-    const { quizId } = req.params;
+    const quizId = req.params.quizId || req.params.id;
     const { violationCount, reason } = req.body;
 
     const count = Number(violationCount) || 1;
@@ -54,7 +54,7 @@ const recordViolation = async (req, res, next) => {
 // @route   GET /api/proctoring/:quizId/session-status
 const getSessionStatus = async (req, res, next) => {
   try {
-    const { quizId } = req.params;
+    const quizId = req.params.quizId || req.params.id;
 
     const sub = await prisma.quizSubmission.findUnique({
       where: {
