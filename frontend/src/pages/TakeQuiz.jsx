@@ -1812,11 +1812,10 @@ const TakeQuiz = ({ user }) => {
   }
 
   // =========================================================================
-  // VIEW A: RESULT / SCORECARD REVIEW & SUBMISSION ACKNOWLEDGMENT
+  // =========================================================================
+  // VIEW A: RESULT / OFFICIAL THANK YOU & SUBMISSION ACKNOWLEDGMENT
   // =========================================================================
   if (submissionResult) {
-    const canShowAnswers = Boolean(quiz?.showResultsAfterSubmit || submissionResult?.showResultsAfterSubmit);
-
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans selection:bg-none">
         {/* Top Institutional Header */}
@@ -1829,303 +1828,139 @@ const TakeQuiz = ({ user }) => {
             />
             <div>
               <div className="text-xs font-bold text-slate-900 tracking-tight">Graphic Era Deemed to be University</div>
-              <div className="text-[10px] text-slate-500 font-medium">Central Examination & Assessment Portal</div>
+              <div className="text-[10px] text-slate-500 font-medium">AI Quest 2026 &bull; Central Examination Portal</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => navigate("/")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#1c1f58] text-white text-xs font-bold shadow-xs hover:bg-[#252975] transition-all cursor-pointer"
+              onClick={() => navigate("/student")}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1c1f58] text-white text-xs font-bold shadow-xs hover:bg-[#252975] transition-all cursor-pointer"
             >
               <ArrowLeft size={13} />
-              <span>Back to Assessments</span>
+              <span>Back to Dashboard</span>
             </button>
           </div>
         </div>
 
         {/* Main Content Area */}
         <div className="max-w-3xl w-full mx-auto px-4 py-8 sm:py-10 space-y-6 flex-1">
-          {!canShowAnswers ? (
-            /* OFFICIAL SUBMISSION ACKNOWLEDGMENT (CONFIDENTIAL MODE: NO SCORES, NO ANSWERS) */
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-200">
-              {/* Header Banner */}
-              <div className="bg-[#1c1f58] px-6 sm:px-8 py-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200 block">
-                    Central Examination Portal
-                  </span>
-                  <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">{quiz.title}</h1>
-                  <p className="text-xs text-indigo-200/90 font-medium">
-                    {quiz.course?.code || "COURSE"} &bull; {quiz.course?.title || "Academic Assessment"}
-                  </p>
-                </div>
-                <div className="self-start sm:self-center">
-                  <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500 text-white inline-flex items-center gap-1.5 shadow-2xs">
-                    <CheckCircle2 size={13} />
-                    <span>Submitted & Logged</span>
-                  </span>
-                </div>
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-200">
+            {/* Header Banner */}
+            <div className="bg-[#1c1f58] px-6 sm:px-8 py-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200 block">
+                  Graphic Era AI Quest 2026 &bull; Official Acknowledgment
+                </span>
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">{quiz.title}</h1>
+                <p className="text-xs text-indigo-200/90 font-medium">
+                  {quiz.course?.code || "AIQ-2026"} &bull; {quiz.course?.title || "Championship Assessment"}
+                </p>
               </div>
-
-              {/* Success Message Banner */}
-              <div className="p-6 sm:p-8 text-center space-y-3 border-b border-slate-100">
-
-                <div className="space-y-1">
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                    Your Paper Has Been Successfully Submitted!
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-lg mx-auto leading-relaxed">
-                    Your assessment answers have been officially logged and encrypted in the university assessment portal. No further changes can be made.
-                  </p>
-                </div>
-              </div>
-
-              {/* Student & Verification Details Grid */}
-              <div className="p-6 sm:p-8 bg-slate-50/50 space-y-5">
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
-                  Candidate Verification & Exam Record
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Candidate Name</span>
-                    <span className="font-extrabold text-slate-900 text-sm block">{user?.name || "Candidate"}</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Registration ID</span>
-                    <span className="font-mono font-extrabold text-slate-900 text-sm block">{user?.registrationId || user?.universityId || user?.mobileNo || "N/A"}</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Class & Stream</span>
-                    <span className="font-bold text-slate-800 block">
-                      {user?.studentClass || "Class 12th"} &bull; {user?.stream || "Science"}
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">School / Institution</span>
-                    <span className="font-bold text-slate-800 block truncate" title={user?.schoolName || "Graphic Era University"}>
-                      {user?.schoolName || "Graphic Era University"}
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Assessment Title</span>
-                    <span className="font-bold text-slate-800 block truncate" title={quiz.title}>
-                      {quiz.title} ({quiz.course?.code || "COURSE"})
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Submission Timestamp</span>
-                    <span className="font-semibold text-slate-700 block">
-                      {new Date().toLocaleString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true
-                      })}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Institutional Integrity & Evaluation Notice */}
-                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-start gap-3">
-
-                  <div className="space-y-0.5 text-xs">
-                    <span className="font-bold text-[#1c1f58] block">Rules for Fair Assessment</span>
-                    <p className="text-slate-600 leading-relaxed text-[11px]">
-                      Your submission was verified and logged under Central Anti-Cheating & AI Proctoring standards. Grades and answer keys will be released by the course instructor per university regulations.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Action */}
-              <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => navigate("/")}
-                  className="w-full sm:w-auto px-8 py-3 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
-                >
-                  <ArrowLeft size={14} />
-                  <span>Return to Assessments Portal</span>
-                </button>
+              <div className="self-start sm:self-center">
+                <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-500 text-white inline-flex items-center gap-1.5 shadow-2xs">
+                  <CheckCircle2 size={14} />
+                  <span>Submitted & Logged</span>
+                </span>
               </div>
             </div>
-          ) : (
-            /* OFFICIAL SCORECARD & DETAILED REVIEW (ONLY WHEN FACULTY EXPLICITLY RELEASED IT) */
-            <>
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-200">
-                {/* Card Top Accent Banner */}
-                <div className="bg-[#1c1f58] px-6 sm:px-8 py-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-indigo-200 text-[11px] font-bold uppercase tracking-wider">
-                      <ShieldCheck size={14} className="text-emerald-400" />
-                      <span>Official Examination Scorecard</span>
-                    </div>
-                    <h1 className="text-lg sm:text-xl font-bold tracking-tight">{quiz.title}</h1>
-                    <p className="text-xs text-indigo-200/90 font-medium">
-                      {quiz.course?.code || "COURSE"} &bull; {quiz.course?.title || "Academic Assessment"}
-                    </p>
-                  </div>
 
-                  <div className="self-start sm:self-center">
-                    <span className={`px-3 py-1.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs ${submissionResult.isPassed
-                      ? "bg-emerald-500 text-white"
-                      : "bg-rose-500 text-white"
-                      }`}>
-                      {submissionResult.isPassed ? (
-                        <>
-                          <CheckCircle2 size={13} />
-                          <span>Qualified / Passed</span>
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle size={13} />
-                          <span>Needs Improvement</span>
-                        </>
-                      )}
-                    </span>
-                  </div>
+            {/* Success Hero Banner */}
+            <div className="p-8 sm:p-10 text-center space-y-4 border-b border-slate-100 bg-linear-to-b from-emerald-50/30 to-white">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600 shadow-xs">
+                <CheckCircle2 size={36} />
+              </div>
+
+              <div className="space-y-1.5">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                  Thank You for Participating!
+                </h2>
+                <p className="text-sm font-bold text-emerald-700">
+                  Your Assessment Has Been Successfully Submitted
+                </p>
+                <p className="text-xs text-slate-500 font-medium max-w-lg mx-auto leading-relaxed pt-1">
+                  Your examination answers have been officially encrypted and recorded on the Graphic Era central examination server. The evaluation and proctoring audit are currently in progress. Official merit rankings and results will be announced by the university.
+                </p>
+              </div>
+            </div>
+
+            {/* Student & Verification Details Grid */}
+            <div className="p-6 sm:p-8 bg-slate-50/50 space-y-5">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                Candidate Verification & Exam Record
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Candidate Name</span>
+                  <span className="font-extrabold text-slate-900 text-sm block">{user?.name || "Candidate"}</span>
                 </div>
 
-                {/* Candidate Meta Info Strip */}
-                <div className="bg-slate-50/70 border-b border-slate-100 px-6 sm:px-8 py-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Candidate Name</span>
-                    <span className="font-bold text-slate-800">{user?.name || "Candidate"}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Registration ID</span>
-                    <span className="font-mono font-bold text-slate-800">{user?.registrationId || user?.universityId || user?.mobileNo || "N/A"}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Class & Stream</span>
-                    <span className="font-semibold text-slate-700">{user?.studentClass || "Class 12th"} &bull; {user?.stream || "Science"}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Status</span>
-                    <span className="font-bold text-emerald-700 inline-flex items-center gap-1">
-                      <CheckCircle2 size={11} /> Submitted & Logged
-                    </span>
-                  </div>
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Registration ID</span>
+                  <span className="font-mono font-extrabold text-slate-900 text-sm block">{user?.registrationId || user?.universityId || user?.mobileNo || "N/A"}</span>
                 </div>
 
-                {/* Performance Metrics Section */}
-                <div className="p-6 sm:p-8 space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Metric 1: Marks Score */}
-                    <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-1 text-center">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Score Obtained</span>
-                      <div className="text-2xl sm:text-3xl font-black text-[#1c1f58]">
-                        {submissionResult.score}
-                        <span className="text-sm font-semibold text-slate-400"> / {submissionResult.totalMarks}</span>
-                      </div>
-                      <span className="text-[10px] text-slate-500 font-medium block">Total Marks Assigned</span>
-                    </div>
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Class & Stream</span>
+                  <span className="font-bold text-slate-800 block">
+                    {user?.studentClass || "Class 12th"} &bull; {user?.stream || "Science"}
+                  </span>
+                </div>
 
-                    {/* Metric 2: Percentage */}
-                    <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-1 text-center">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Percentage</span>
-                      <div className="text-2xl sm:text-3xl font-black text-indigo-900">
-                        {submissionResult.percentage}%
-                      </div>
-                      <span className="text-[10px] text-slate-500 font-medium block">
-                        {submissionResult.isPassed ? "Above Passing Cutoff" : "Below Minimum Cutoff"}
-                      </span>
-                    </div>
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">School / Institution</span>
+                  <span className="font-bold text-slate-800 block truncate" title={user?.schoolName || "Graphic Era University"}>
+                    {user?.schoolName || "Graphic Era University"}
+                  </span>
+                </div>
 
-                    {/* Metric 3: Passing Benchmark */}
-                    <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-1 text-center">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Passing Benchmark</span>
-                      <div className="text-2xl sm:text-3xl font-black text-slate-700">
-                        {quiz.passingMarks || submissionResult.passingMarks || 0}
-                        <span className="text-sm font-semibold text-slate-400"> Marks</span>
-                      </div>
-                      <span className="text-[10px] text-slate-500 font-medium block">Required to Qualify</span>
-                    </div>
-                  </div>
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Assessment Title</span>
+                  <span className="font-bold text-slate-800 block truncate" title={quiz.title}>
+                    {quiz.title}
+                  </span>
+                </div>
 
-                  {/* Security & Verification Banner */}
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-[11px] font-medium flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck size={15} className="text-emerald-600 shrink-0" />
-                      <span>Candidate session evaluated under academic integrity protocol. Records synced to official gradebook.</span>
-                    </div>
-                    <span className="font-mono text-[10px] text-slate-400 font-bold shrink-0">
-                      ID: {submissionResult.submissionId ? submissionResult.submissionId.slice(0, 8) : "VERIFIED"}
-                    </span>
-                  </div>
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-1 shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Submission Timestamp</span>
+                  <span className="font-semibold text-slate-700 block">
+                    {new Date().toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true
+                    })}
+                  </span>
                 </div>
               </div>
 
-              {/* Detailed Solutions */}
-              {submissionResult.detailedAnalysis && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <FileText size={16} className="text-[#1c1f58]" />
-                    <span>Question-by-Question Review</span>
-                  </h3>
-                  {submissionResult.detailedAnalysis.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-5 rounded-2xl border bg-white space-y-3 ${item.isCorrect
-                        ? "border-emerald-200 bg-emerald-50/20"
-                        : item.isAttempted
-                          ? "border-rose-200 bg-rose-50/20"
-                          : "border-slate-200"
-                        }`}
-                    >
-                      <div className="flex items-center justify-between text-xs font-bold">
-                        <span className="text-slate-500">Question {idx + 1}</span>
-                        <span className={item.isCorrect ? "text-emerald-700" : item.isAttempted ? "text-rose-700" : "text-slate-400"}>
-                          {item.isCorrect ? `+${item.marksAwarded} Marks` : item.isAttempted ? `${item.marksAwarded} Marks` : "Unattempted"}
-                        </span>
-                      </div>
-
-                      <p className="text-xs font-bold text-slate-800">{item.questionText}</p>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {item.options.map((opt, optIdx) => {
-                          const isStudentChoice = item.studentSelected === optIdx;
-                          const isCorrectAnswer = item.correctOptionIndex === optIdx;
-                          return (
-                            <div
-                              key={optIdx}
-                              className={`p-2.5 rounded-xl border text-xs font-medium flex items-center gap-2 ${isCorrectAnswer
-                                ? "border-emerald-500 bg-emerald-100/70 text-emerald-950 font-bold"
-                                : isStudentChoice
-                                  ? "border-rose-500 bg-rose-100/70 text-rose-950 font-bold"
-                                  : "border-slate-100 bg-slate-50 text-slate-600"
-                                }`}
-                            >
-                              <span className="font-bold">{String.fromCharCode(65 + optIdx)}:</span>
-                              <span>{opt}</span>
-                              {isCorrectAnswer && <span className="ml-auto text-[10px] text-emerald-700 font-extrabold">CORRECT</span>}
-                              {isStudentChoice && !isCorrectAnswer && <span className="ml-auto text-[10px] text-rose-700 font-extrabold">YOUR CHOICE</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {item.explanation && (
-                        <div className="p-3 rounded-xl bg-purple-50 text-purple-900 text-[11px] font-medium border border-purple-100">
-                          <span className="font-bold">Explanation: </span>
-                          {item.explanation}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+              {/* Institutional Notice */}
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-start gap-3">
+                <ShieldCheck size={18} className="text-[#1c1f58] shrink-0 mt-0.5" />
+                <div className="space-y-0.5 text-xs">
+                  <span className="font-bold text-[#1c1f58] block">Central Examination Protocol</span>
+                  <p className="text-slate-600 leading-relaxed text-[11px]">
+                    Your session was conducted under institutional anti-cheating and AI proctoring protocols. Official scores and certificates will be communicated directly to your school and student dashboard.
+                  </p>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            </div>
+
+            {/* Bottom Action */}
+            <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => navigate("/student")}
+                className="w-full sm:w-auto px-8 py-3 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold tracking-wide shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+              >
+                <ArrowLeft size={14} />
+                <span>Return to Student Dashboard</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Institutional Footer */}

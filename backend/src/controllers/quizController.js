@@ -443,16 +443,10 @@ const submitQuiz = async (req, res, next) => {
       const existingResult = {
         id: existingSub.id,
         submissionId: existingSub.id,
-        score: existingSub.score,
-        totalMarks: existingSub.totalMarks,
-        percentage: existingSub.percentage,
-        isPassed: existingSub.isPassed,
-        passingMarks: quiz.passingMarks,
         status: existingSub.status,
         submittedAt: existingSub.submittedAt,
-        showResultsAfterSubmit: Boolean(quiz.showResultsAfterSubmit),
-        alreadySubmitted: true,
-        detailedAnalysis
+        showResultsAfterSubmit: false,
+        alreadySubmitted: true
       };
       return res.json({
         success: true,
@@ -505,18 +499,9 @@ const submitQuiz = async (req, res, next) => {
     const resultPayload = {
       id: submission.id,
       submissionId: submission.id,
-      score: submission.score,
-      totalMarks: submission.totalMarks,
-      percentage: submission.percentage,
-      isPassed: submission.isPassed,
-      passingMarks: quiz.passingMarks,
       status: submission.status,
       submittedAt: submission.submittedAt,
-      correctCount,
-      incorrectCount,
-      unattemptedCount,
-      showResultsAfterSubmit: Boolean(quiz.showResultsAfterSubmit),
-      detailedAnalysis
+      showResultsAfterSubmit: false
     };
 
     res.json({
