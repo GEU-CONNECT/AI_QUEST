@@ -497,10 +497,525 @@ const getExecutiveAudit = async (req, res, next) => {
   }
 };
 
+// @desc    Create new Lab Sub-Admin account
+// @route   POST /api/admin/subadmins
+const createSubAdmin = async (req, res, next) => {
+  try {
+    const { name, mobileNo, email, password, labNumber } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Sub-admin name is required.' });
+    }
+    const cleanMobile = mobileNo ? mobileNo.toString().replace(/[^0-9]/g, '').slice(-10) : '';
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      return res.status(400).json({ success: false, message: 'Valid 10-digit mobile number is required.' });
+    }
+    if (!password || password.length < 4) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters.' });
+    }
+
+    const existingUser = await prisma.user.findFirst({
+      where: { mobileNo: cleanMobile }
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: `Account with mobile number ${cleanMobile} already exists (${existingUser.role}).`
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const assignedLab = (labNumber && labNumber.trim()) ? labNumber.trim().toUpperCase() : 'LAB-01';
+    const regId = `SUB-${assignedLab.replace(/[^A-Z0-9]/g, '')}-${cleanMobile.slice(-4)}`;
+
+    const newSubAdmin = await prisma.user.create({
+      data: {
+        registrationId: regId,
+        name: name.trim(),
+        mobileNo: cleanMobile,
+        email: email && email.trim() ? email.trim().toLowerCase() : `${assignedLab.toLowerCase().replace(/[^a-z0-9]/g, '')}@geu.ac.in`,
+        passwordHash,
+        role: 'SUBADMIN',
+        labNumber: assignedLab
+      },
+      select: {
+        id: true,
+        registrationId: true,
+        name: true,
+        mobileNo: true,
+        email: true,
+        labNumber: true,
+        createdAt: true
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Sub-Admin ${newSubAdmin.name} created successfully for ${assignedLab}.`,
+      subAdmin: newSubAdmin
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete a Sub-Admin account
+// @route   DELETE /api/admin/subadmins/:id
+const deleteSubAdmin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'Sub-Admin account not found.' });
+    }
+
+    if (targetUser.role !== 'SUBADMIN') {
+      return res.status(403).json({ success: false, message: 'Cannot delete accounts that are not Sub-Admins.' });
+    }
+
+    await prisma.user.delete({ where: { id } });
+
+    res.json({
+      success: true,
+      message: `Sub-Admin account ${targetUser.name} deleted successfully.`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all student submissions for admin view
+// @route   GET /api/admin/submissions
+const getSubmissions = async (req, res, next) => {
+  try {
+    const { search = '', quizId = '', status = '' } = req.query;
+
+    const whereClause = {
+      ...(quizId ? { quizId } : {}),
+      ...(status ? { status } : {}),
+      ...(search ? {
+        OR: [
+          { studentName: { contains: search } },
+          { studentRollNo: { contains: search } },
+          { student: { mobileNo: { contains: search } } },
+          { student: { schoolName: { contains: search } } },
+          { quiz: { title: { contains: search } } }
+        ]
+      } : {})
+    };
+
+    const submissions = await prisma.quizSubmission.findMany({
+      where: whereClause,
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            registrationId: true,
+            mobileNo: true,
+            email: true,
+            schoolName: true,
+            city: true,
+            studentClass: true,
+            stream: true,
+            parentName: true,
+            parentContact: true,
+            labNumber: true
+          }
+        },
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+            totalMarks: true,
+            passingMarks: true
+          }
+        }
+      },
+      orderBy: { startedAt: 'desc' }
+    });
+
+    const formatted = submissions.map((s) => ({
+      id: s.id,
+      studentId: s.studentId,
+      studentName: s.student?.name || s.studentName,
+      studentRollNo: s.student?.registrationId || s.studentRollNo,
+      mobileNo: s.student?.mobileNo || '',
+      email: s.student?.email || '',
+      schoolName: s.student?.schoolName || '',
+      city: s.student?.city || '',
+      studentClass: s.student?.studentClass || '',
+      stream: s.student?.stream || '',
+      quizTitle: s.quiz?.title || 'Assessment',
+      courseCode: 'AI-QUEST',
+      facultyName: 'Graphic Era Super Admin',
+      score: s.score,
+      totalMarks: s.totalMarks || s.quiz?.totalMarks || 30,
+      percentage: s.percentage,
+      isPassed: s.isPassed,
+      status: s.status,
+      tabViolations: s.tabViolations || 0,
+      startedAt: s.startedAt,
+      submittedAt: s.submittedAt
+    }));
+
+    res.json({
+      success: true,
+      count: formatted.length,
+      submissions: formatted
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete single submission
+// @route   DELETE /api/admin/submissions/:id
+const deleteSubmission = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await prisma.quizSubmission.delete({
+      where: { id }
+    });
+    res.json({ success: true, message: 'Submission record removed.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete all submissions
+// @route   DELETE /api/admin/submissions/all
+const deleteAllSubmissions = async (req, res, next) => {
+  try {
+    await prisma.quizSubmission.deleteMany({});
+    res.json({ success: true, message: 'All student submissions deleted successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Unlock candidate submission
+// @route   POST /api/admin/submissions/:id/unlock
+const unlockSubmission = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const sub = await prisma.quizSubmission.update({
+      where: { id },
+      data: {
+        status: 'IN_PROGRESS',
+        lockReason: null,
+        tabViolations: 0
+      },
+      include: { student: true }
+    });
+    res.json({
+      success: true,
+      message: `Candidate ${sub.student?.name || 'student'} has been unlocked.`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Lock candidate submission
+// @route   POST /api/admin/submissions/:id/lock
+const lockSubmission = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason = 'Locked by invigilator/admin' } = req.body;
+    const sub = await prisma.quizSubmission.update({
+      where: { id },
+      data: {
+        status: 'LOCKED',
+        lockReason: reason
+      },
+      include: { student: true }
+    });
+    res.json({
+      success: true,
+      message: `Candidate ${sub.student?.name || 'student'} is now locked.`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset candidate submission attempt
+// @route   POST /api/admin/submissions/:id/reset
+const resetSubmission = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const sub = await prisma.quizSubmission.update({
+      where: { id },
+      data: {
+        answers: '{}',
+        score: 0,
+        percentage: 0,
+        isPassed: false,
+        status: 'IN_PROGRESS',
+        lockReason: null,
+        tabViolations: 0,
+        startedAt: new Date(),
+        submittedAt: null
+      },
+      include: { student: true }
+    });
+    res.json({
+      success: true,
+      message: `Candidate attempt reset successfully.`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get Evaluated Results with Rankings & Tab Switch Violations
+// @route   GET /api/admin/results
+const getResults = async (req, res, next) => {
+  try {
+    const { search = '', top = '', sortBy = 'score', order = 'desc' } = req.query;
+
+    const whereClause = {
+      ...(search ? {
+        OR: [
+          { studentName: { contains: search } },
+          { studentRollNo: { contains: search } },
+          { student: { mobileNo: { contains: search } } },
+          { student: { schoolName: { contains: search } } },
+          { student: { city: { contains: search } } },
+          { quiz: { title: { contains: search } } }
+        ]
+      } : {})
+    };
+
+    const submissions = await prisma.quizSubmission.findMany({
+      where: whereClause,
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            registrationId: true,
+            mobileNo: true,
+            email: true,
+            schoolName: true,
+            city: true,
+            studentClass: true,
+            stream: true,
+            parentName: true,
+            parentContact: true,
+            labNumber: true
+          }
+        },
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+            totalMarks: true,
+            passingMarks: true
+          }
+        }
+      },
+      orderBy: [
+        { score: 'desc' },
+        { submittedAt: 'asc' }
+      ]
+    });
+
+    // Custom sorting if requested
+    let sorted = submissions;
+    if (sortBy === 'tabViolations') {
+      sorted = [...submissions].sort((a, b) => order === 'asc' ? a.tabViolations - b.tabViolations : b.tabViolations - a.tabViolations);
+    } else if (sortBy === 'submittedAt') {
+      sorted = [...submissions].sort((a, b) => {
+        const timeA = new Date(a.submittedAt || a.startedAt).getTime();
+        const timeB = new Date(b.submittedAt || b.startedAt).getTime();
+        return order === 'asc' ? timeA - timeB : timeB - timeA;
+      });
+    }
+
+    // Assign Rank based on score & completion
+    const ranked = sorted.map((s, idx) => ({
+      rank: idx + 1,
+      id: s.id,
+      studentId: s.studentId,
+      name: s.student?.name || s.studentName,
+      registrationId: s.student?.registrationId || s.studentRollNo,
+      mobileNo: s.student?.mobileNo || '',
+      email: s.student?.email || '',
+      schoolName: s.student?.schoolName || 'Graphic Era Participant',
+      city: s.student?.city || 'Dehradun',
+      studentClass: s.student?.studentClass || 'Class 12th',
+      stream: s.student?.stream || '',
+      labNumber: s.student?.labNumber || 'LAB-01',
+      quizTitle: s.quiz?.title || 'Grand AI Quest',
+      score: s.score,
+      totalMarks: s.totalMarks || s.quiz?.totalMarks || 30,
+      percentage: s.percentage,
+      isPassed: s.isPassed,
+      status: s.status,
+      tabViolations: s.tabViolations || 0,
+      startedAt: s.startedAt,
+      submittedAt: s.submittedAt
+    }));
+
+    // If dynamic top filter specified (10, 20, 50, 100)
+    const limitNum = parseInt(top, 10);
+    const finalResults = limitNum > 0 ? ranked.slice(0, limitNum) : ranked;
+
+    res.json({
+      success: true,
+      total: ranked.length,
+      count: finalResults.length,
+      filter: top ? `Top ${top}` : 'All',
+      results: finalResults
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Export Ranked Results to Excel (.xlsx) with Tab Switch Count
+// @route   GET /api/admin/export/results
+const exportResultsExcel = async (req, res, next) => {
+  try {
+    const { search = '', top = '' } = req.query;
+
+    const whereClause = {
+      ...(search ? {
+        OR: [
+          { studentName: { contains: search } },
+          { studentRollNo: { contains: search } },
+          { student: { mobileNo: { contains: search } } },
+          { student: { schoolName: { contains: search } } },
+          { student: { city: { contains: search } } },
+          { quiz: { title: { contains: search } } }
+        ]
+      } : {})
+    };
+
+    const submissions = await prisma.quizSubmission.findMany({
+      where: whereClause,
+      include: {
+        student: true,
+        quiz: true
+      },
+      orderBy: [
+        { score: 'desc' },
+        { submittedAt: 'asc' }
+      ]
+    });
+
+    const limitNum = parseInt(top, 10);
+    const finalSubmissions = limitNum > 0 ? submissions.slice(0, limitNum) : submissions;
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Graphic Era University - AI Quest 2026';
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet('AI Quest 2026 Results', {
+      pageSetup: { orientation: 'landscape' }
+    });
+
+    worksheet.columns = [
+      { header: 'Rank', key: 'rank', width: 10 },
+      { header: 'Candidate Full Name', key: 'name', width: 28 },
+      { header: 'Registration ID', key: 'regId', width: 22 },
+      { header: 'Mobile Number', key: 'mobile', width: 18 },
+      { header: 'Email ID', key: 'email', width: 30 },
+      { header: 'School Name', key: 'school', width: 34 },
+      { header: 'City', key: 'city', width: 18 },
+      { header: 'Class', key: 'class', width: 14 },
+      { header: 'Stream', key: 'stream', width: 22 },
+      { header: 'Assessment Title', key: 'quizTitle', width: 30 },
+      { header: 'Score Obtained', key: 'score', width: 16 },
+      { header: 'Total Marks', key: 'totalMarks', width: 14 },
+      { header: 'Percentage', key: 'percentage', width: 14 },
+      { header: 'Result', key: 'result', width: 14 },
+      { header: 'Tab Switch Violations', key: 'tabViolations', width: 22 },
+      { header: 'Submission Time', key: 'submittedAt', width: 24 }
+    ];
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 30;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1C1F58' }
+      };
+      cell.font = {
+        color: { argb: 'FFFFFFFF' },
+        bold: true,
+        size: 11
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'medium' },
+        right: { style: 'thin' }
+      };
+    });
+
+    finalSubmissions.forEach((s, idx) => {
+      const row = worksheet.addRow({
+        rank: idx + 1,
+        name: s.student?.name || s.studentName,
+        regId: s.student?.registrationId || s.studentRollNo,
+        mobile: s.student?.mobileNo || '',
+        email: s.student?.email || '',
+        school: s.student?.schoolName || '',
+        city: s.student?.city || 'Dehradun',
+        class: s.student?.studentClass || 'Class 12th',
+        stream: s.student?.stream || '',
+        quizTitle: s.quiz?.title || 'AI Quest 2026',
+        score: s.score,
+        totalMarks: s.totalMarks || s.quiz?.totalMarks || 30,
+        percentage: `${s.percentage}%`,
+        result: s.isPassed ? 'PASSED' : 'FAILED',
+        tabViolations: `${s.tabViolations || 0} Switches`,
+        submittedAt: s.submittedAt ? new Date(s.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'
+      });
+
+      // Highlight Top 3 rows
+      if (idx === 0) {
+        row.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF9C4' } }; // Light gold
+        });
+      }
+    });
+
+    const fileName = `AI_Quest_2026_Results_${top ? 'Top_' + top + '_' : ''}${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStudents,
   exportStudentsExcel,
   getSubAdmins,
+  createSubAdmin,
+  deleteSubAdmin,
+  getSubmissions,
+  deleteSubmission,
+  deleteAllSubmissions,
+  unlockSubmission,
+  lockSubmission,
+  resetSubmission,
+  getResults,
+  exportResultsExcel,
   getEventOverview,
   getLeaderboard,
   getLiveMonitor,

@@ -46,7 +46,9 @@ import {
   Mail,
   MapPin,
   Copy,
-  Filter
+  Filter,
+  Trophy,
+  UserPlus
 } from "lucide-react";
 import api from "../api/client";
 import CreateQuizView from "../components/CreateQuizView";
@@ -82,6 +84,30 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [facultyFilter, setFacultyFilter] = useState("ALL");
   const [courseFilter, setCourseFilter] = useState("ALL");
   const [submissionSearch, setSubmissionSearch] = useState("");
+
+  // Sub-Admin Management State
+  const [subAdmins, setSubAdmins] = useState([]);
+  const [loadingSubAdmins, setLoadingSubAdmins] = useState(false);
+  const [subAdminSearch, setSubAdminSearch] = useState("");
+  const [subAdminForm, setSubAdminForm] = useState({
+    name: "",
+    mobileNo: "",
+    password: "",
+    labNumber: "LAB-01"
+  });
+  const [isCreatingSubAdmin, setIsCreatingSubAdmin] = useState(false);
+  const [subAdminSuccessMsg, setSubAdminSuccessMsg] = useState("");
+  const [subAdminErrorMsg, setSubAdminErrorMsg] = useState("");
+  const [deletingSubAdminId, setDeletingSubAdminId] = useState(null);
+
+  // Results & Leaderboard State with Tab Switch Violation Telemetry
+  const [resultsData, setResultsData] = useState([]);
+  const [loadingResults, setLoadingResults] = useState(false);
+  const [resultsTopFilter, setResultsTopFilter] = useState("ALL");
+  const [resultsSearch, setResultsSearch] = useState("");
+  const [resultsSortBy, setResultsSortBy] = useState("score");
+  const [resultsOrder, setResultsOrder] = useState("desc");
+  const [isExportingResultsExcel, setIsExportingResultsExcel] = useState(false);
 
   // Registered Candidates (AI Quest Questers) State
   const [studentsList, setStudentsList] = useState([]);
@@ -355,14 +381,26 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     } else if (activeTab === "proctoring-rules") {
       fetchProctoringRules();
       fetchLiveMonitorData();
-    } else if (activeTab === "accreditation") {
-      fetchAccreditationReport();
-    } else if (activeTab === "audit-logs") {
-      fetchAuditLogs();
     } else if (activeTab === "academic-structure") {
       fetchAcademicStructureData();
+    } else if (activeTab === "results") {
+      fetchResults();
+    } else if (activeTab === "create-subadmin" || activeTab === "faculties") {
+      fetchSubAdmins();
+    } else if (activeTab === "submissions") {
+      fetchAdminData();
     }
   }, [activeTab]);
+
+  // Results dynamic filter & sort effect
+  useEffect(() => {
+    if (activeTab === "results") {
+      const timer = setTimeout(() => {
+        fetchResults();
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [resultsTopFilter, resultsSearch, resultsSortBy, resultsOrder]);
 
   // Debounced search & filter effect for registered students
   useEffect(() => {
@@ -434,30 +472,162 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [overviewRes, quizzesRes, submissionsRes, coursesRes] = await Promise.all([
+      const [overviewRes, quizzesRes, submissionsRes, coursesRes] = await Promise.allSettled([
         api.get("/admin/overview"),
-        api.get("/admin/quizzes"),
+        api.get("/quizzes"),
         api.get("/admin/submissions"),
         api.get("/courses")
       ]);
 
-      if (overviewRes.data.success) {
-        setOverviewStats(overviewRes.data.stats);
-        setFacultyBreakdown(overviewRes.data.facultyBreakdown || []);
+      if (overviewRes.status === "fulfilled" && overviewRes.value.data?.success) {
+        setOverviewStats(overviewRes.value.data.stats);
+        setFacultyBreakdown(overviewRes.value.data.facultyBreakdown || []);
       }
-      if (quizzesRes.data.success) {
-        setQuizzes(quizzesRes.data.quizzes);
+      if (quizzesRes.status === "fulfilled" && quizzesRes.value.data?.success) {
+        setQuizzes(quizzesRes.value.data.quizzes || []);
       }
-      if (submissionsRes.data.success) {
-        setSubmissions(submissionsRes.data.submissions);
+      if (submissionsRes.status === "fulfilled" && submissionsRes.value.data?.success) {
+        setSubmissions(submissionsRes.value.data.submissions || []);
       }
-      if (coursesRes.data.success) {
-        setCourses(coursesRes.data.courses || []);
+      if (coursesRes.status === "fulfilled" && coursesRes.value.data?.success) {
+        setCourses(coursesRes.value.data.courses || []);
       }
     } catch (err) {
       console.error("Failed to load admin data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Sub-Admins Handlers
+  const fetchSubAdmins = async () => {
+    try {
+      setLoadingSubAdmins(true);
+      const res = await api.get("/admin/subadmins");
+      if (res.data?.success) {
+        setSubAdmins(res.data.subAdmins || []);
+      }
+    } catch (err) {
+      console.error("Failed to load sub-admins:", err);
+    } finally {
+      setLoadingSubAdmins(false);
+    }
+  };
+
+  const handleCreateSubAdmin = async (e) => {
+    e.preventDefault();
+    setSubAdminErrorMsg("");
+    setSubAdminSuccessMsg("");
+
+    if (!subAdminForm.name.trim()) {
+      setSubAdminErrorMsg("Please enter sub-admin invigilator name.");
+      return;
+    }
+    const cleanMobile = subAdminForm.mobileNo.replace(/[^0-9]/g, "");
+    if (cleanMobile.length !== 10) {
+      setSubAdminErrorMsg("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    if (!subAdminForm.password || subAdminForm.password.length < 4) {
+      setSubAdminErrorMsg("Password must be at least 4 characters.");
+      return;
+    }
+
+    try {
+      setIsCreatingSubAdmin(true);
+      const res = await api.post("/admin/subadmins", {
+        name: subAdminForm.name.trim(),
+        mobileNo: cleanMobile,
+        password: subAdminForm.password,
+        labNumber: subAdminForm.labNumber || "LAB-01"
+      });
+
+      if (res.data?.success) {
+        setSubAdminSuccessMsg(`Sub-Admin ${res.data.subAdmin?.name} created successfully for ${res.data.subAdmin?.labNumber}!`);
+        setSubAdminForm({
+          name: "",
+          mobileNo: "",
+          password: "",
+          labNumber: "LAB-01"
+        });
+        fetchSubAdmins();
+        setTimeout(() => setSubAdminSuccessMsg(""), 5000);
+      }
+    } catch (err) {
+      setSubAdminErrorMsg(err.response?.data?.message || "Failed to create Sub-Admin account.");
+    } finally {
+      setIsCreatingSubAdmin(false);
+    }
+  };
+
+  const handleDeleteSubAdmin = async (id, name, lab) => {
+    if (!window.confirm(`Are you sure you want to remove Sub-Admin "${name}" (${lab})?\n\nThey will no longer be able to log in or unlock student sessions.`)) {
+      return;
+    }
+    try {
+      setDeletingSubAdminId(id);
+      const res = await api.delete(`/admin/subadmins/${id}`);
+      if (res.data?.success) {
+        setSubAdmins((prev) => prev.filter((s) => s.id !== id));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete sub-admin");
+    } finally {
+      setDeletingSubAdminId(null);
+    }
+  };
+
+  // Results Handlers
+  const fetchResults = async () => {
+    try {
+      setLoadingResults(true);
+      const topParam = resultsTopFilter === "ALL" ? "" : resultsTopFilter;
+      const res = await api.get(`/admin/results`, {
+        params: {
+          top: topParam,
+          search: resultsSearch,
+          sortBy: resultsSortBy,
+          order: resultsOrder
+        }
+      });
+      if (res.data?.success) {
+        setResultsData(res.data.results || []);
+      }
+    } catch (err) {
+      console.error("Failed to load results:", err);
+    } finally {
+      setLoadingResults(false);
+    }
+  };
+
+  const handleExportResultsExcel = async () => {
+    try {
+      setIsExportingResultsExcel(true);
+      const topParam = resultsTopFilter === "ALL" ? "" : resultsTopFilter;
+      const res = await api.get(`/admin/export/results`, {
+        params: {
+          top: topParam,
+          search: resultsSearch
+        },
+        responseType: "blob"
+      });
+
+      const blob = new Blob([res.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `AI_Quest_2026_Ranked_Results_${resultsTopFilter !== "ALL" ? "Top_" + resultsTopFilter + "_" : ""}${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Failed to export results excel", err);
+      alert("Failed to export results to Excel.");
+    } finally {
+      setIsExportingResultsExcel(false);
     }
   };
 
@@ -3338,6 +3508,7 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                     <th className="py-3 px-4">Assessment</th>
                     <th className="py-3 px-4">Faculty Author</th>
                     <th className="py-3 px-4">Score</th>
+                    <th className="py-3 px-4 text-center">Tab Switches</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Submitted</th>
                     <th className="py-3 px-4 text-right">Actions</th>
@@ -3346,7 +3517,7 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                   {filteredSubmissions.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="py-8 text-center text-slate-400 font-semibold">
+                      <td colSpan="8" className="py-8 text-center text-slate-400 font-semibold">
                         No submissions recorded yet.
                       </td>
                     </tr>
@@ -3364,6 +3535,17 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                         <td className="py-3 px-4 text-slate-600">{s.facultyName}</td>
                         <td className="py-3 px-4 font-bold text-slate-900">
                           {s.score} / {s.totalMarks} ({s.percentage}%)
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            (s.tabViolations || 0) === 0
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : (s.tabViolations || 0) <= 2
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : "bg-rose-50 text-rose-700 border border-rose-200"
+                          }`}>
+                            {s.tabViolations || 0} Switches
+                          </span>
                         </td>
                         <td className="py-3 px-4">
                           <span
@@ -3417,139 +3599,215 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
         </div>
       )}
 
-      {/* 6. TAB: FACULTIES */}
-      {activeTab === "faculties" && (
+      {/* TAB: CREATE QUIZ (Direct Super Admin Assessment Studio) */}
+      {activeTab === "create-quiz" && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-black text-slate-900">Faculty Academic Creators</h2>
-              <p className="text-xs text-slate-500">Summary of assessment creators across departments</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {facultyBreakdown.map((f) => (
-              <div key={f.facultyId} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="font-extrabold text-sm text-slate-900">{f.facultyName}</div>
-                  <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                    {f.facultyUniversityId}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-500">{f.facultyEmail}</div>
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-600">
-                  <span>Assessments Created</span>
-                  <span className="text-[#1c1f58] font-black">{f.quizzesCount}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <CreateQuizView
+            onBack={() => onTabChange && onTabChange("quizzes")}
+            onCreated={() => {
+              fetchAdminData();
+              if (onTabChange) onTabChange("quizzes");
+            }}
+          />
         </div>
       )}
 
-      {/* 7. TAB: NAAC / NBA ACCREDITATION AUDIT */}
-      {activeTab === "accreditation" && (
-        <div className="space-y-4">
+      {/* TAB: CREATE & MANAGE SUB-ADMINS */}
+      {(activeTab === "create-subadmin" || activeTab === "faculties") && (
+        <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <Award size={18} className="text-[#1c1f58]" />
-                <span>NAAC & NBA Institutional Accreditation Summary Ledger</span>
+                <Building2 size={18} className="text-[#1c1f58]" />
+                <span>Lab Sub-Admins Management</span>
               </h2>
-              <p className="text-xs text-slate-500">Official semester-wise outcome assessment ledger for departmental reviews and audits</p>
+              <p className="text-xs text-slate-500">
+                Manage lab invigilator credentials for AI Quest 2026. Sub-admins are strictly granted rights to monitor sessions and unlock/reset student attempts in their assigned lab.
+              </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleExportAccreditationCSV}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
-              >
-                <Download size={14} />
-                <span>Export CSV Ledger</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
-              >
-                <Printer size={14} />
-                <span>Print / PDF Audit Report</span>
-              </button>
+              <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[#1c1f58] font-bold text-xs flex items-center gap-1.5">
+                <Users size={14} />
+                <span>{subAdmins.length} Active Sub-Admins</span>
+              </span>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+          {/* Creation Form Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 sm:p-6">
+            <h3 className="text-sm font-black text-slate-900 mb-1 flex items-center gap-2">
+              <UserPlus size={16} className="text-[#1c1f58]" />
+              <span>Create New Lab Sub-Admin Account</span>
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Enter invigilator details and assign a physical examination lab.
+            </p>
+
+            {subAdminSuccessMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{subAdminSuccessMsg}</span>
+              </div>
+            )}
+            {subAdminErrorMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                <span>{subAdminErrorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateSubAdmin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Full Name / Invigilator Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={subAdminForm.name}
+                  onChange={(e) => setSubAdminForm({ ...subAdminForm, name: e.target.value })}
+                  placeholder="e.g. Invigilator LAB-21"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Mobile Number (Login ID)
+                </label>
+                <input
+                  type="tel"
+                  required
+                  maxLength={10}
+                  value={subAdminForm.mobileNo}
+                  onChange={(e) => setSubAdminForm({ ...subAdminForm, mobileNo: e.target.value })}
+                  placeholder="10-digit mobile number"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Password
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={subAdminForm.password}
+                  onChange={(e) => setSubAdminForm({ ...subAdminForm, password: e.target.value })}
+                  placeholder="e.g. geu@123"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  Assigned Lab
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={subAdminForm.labNumber}
+                    onChange={(e) => setSubAdminForm({ ...subAdminForm, labNumber: e.target.value })}
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58] bg-white"
+                  >
+                    {Array.from({ length: 30 }, (_, i) => {
+                      const lab = `LAB-${String(i + 1).padStart(2, "0")}`;
+                      return <option key={lab} value={lab}>{lab}</option>;
+                    })}
+                  </select>
+
+                  <button
+                    type="submit"
+                    disabled={isCreatingSubAdmin}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {isCreatingSubAdmin ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Plus size={14} />
+                    )}
+                    <span>Create</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Sub-Admins Directory Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-sm text-slate-900">Configured Sub-Admin Roster</span>
+                <span className="text-xs text-slate-400">({subAdmins.length})</span>
+              </div>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={subAdminSearch}
+                  onChange={(e) => setSubAdminSearch(e.target.value)}
+                  placeholder="Search sub-admin, mobile, or lab..."
+                  className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58] bg-white w-56 sm:w-64"
+                />
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                    <th className="py-3 px-4">Sem</th>
-                    <th className="py-3 px-4">Department</th>
-                    <th className="py-3 px-4">Course Code & Title</th>
-                    <th className="py-3 px-4 text-center">Assessments</th>
-                    <th className="py-3 px-4 text-center">Evaluated</th>
-                    <th className="py-3 px-4 text-center">Passed</th>
-                    <th className="py-3 px-4 text-center">Failed</th>
-                    <th className="py-3 px-4 text-center">Avg Marks</th>
-                    <th className="py-3 px-4 text-center">Pass Rate</th>
-                    <th className="py-3 px-4 text-center">NAAC Dossier</th>
+                    <th className="py-3 px-4">Lab</th>
+                    <th className="py-3 px-4">Invigilator Name</th>
+                    <th className="py-3 px-4">Login Mobile</th>
+                    <th className="py-3 px-4">Registration ID</th>
+                    <th className="py-3 px-4">Authorized Permissions</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {accreditationReport.length === 0 ? (
-                    <tr>
-                      <td colSpan="10" className="py-8 text-center text-slate-400 font-semibold">
-                        No courses recorded for accreditation audit.
-                      </td>
-                    </tr>
-                  ) : (
-                    accreditationReport.map((row, idx) => (
-                      <tr
-                        key={idx}
-                        onClick={() => handleOpenCourseAccreditation(row.courseId || row.courseCode)}
-                        className="hover:bg-indigo-50/50 transition-colors cursor-pointer group"
-                        title="Click to inspect in-depth NAAC course accreditation dossier & student marks ledger"
-                      >
-                        <td className="py-3 px-4 font-bold text-[#1c1f58]">Sem {row.semester}</td>
-                        <td className="py-3 px-4 text-slate-600 font-semibold">{row.department}</td>
+                  {subAdmins
+                    .filter((s) => {
+                      const q = subAdminSearch.toLowerCase();
+                      return (
+                        s.name?.toLowerCase().includes(q) ||
+                        s.mobileNo?.includes(q) ||
+                        s.labNumber?.toLowerCase().includes(q) ||
+                        s.registrationId?.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((s) => (
+                      <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="py-3 px-4">
-                          <span className="font-mono font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                            {row.courseCode}
-                          </span>{" "}
-                          - {row.courseTitle}
-                        </td>
-                        <td className="py-3 px-4 text-center font-bold text-slate-700">{row.totalAssessments}</td>
-                        <td className="py-3 px-4 text-center font-bold text-slate-800">{row.totalEvaluated}</td>
-                        <td className="py-3 px-4 text-center font-bold text-emerald-700">{row.passedCount}</td>
-                        <td className="py-3 px-4 text-center font-bold text-rose-700">{row.failedCount}</td>
-                        <td className="py-3 px-4 text-center font-mono font-bold text-slate-900">{row.averageScore}</td>
-                        <td className="py-3 px-4 text-center">
-                          <span
-                            className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                              row.passPercentage >= 60
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border border-amber-200"
-                            }`}
-                          >
-                            {row.passPercentage}%
+                          <span className="font-mono font-bold text-xs bg-indigo-50 text-[#1c1f58] border border-indigo-200 px-2.5 py-1 rounded-lg">
+                            {s.labNumber || "LAB-01"}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-3 px-4 font-bold text-slate-900">{s.name}</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-slate-700">{s.mobileNo}</td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-slate-400">{s.registrationId}</td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            <Lock size={10} />
+                            <span>Unlock & Reset Attempts Only</span>
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenCourseAccreditation(row.courseId || row.courseCode);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-[#1c1f58] bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-2xs group-hover:bg-[#1c1f58] group-hover:text-white"
+                            onClick={() => handleDeleteSubAdmin(s.id, s.name, s.labNumber)}
+                            disabled={deletingSubAdminId === s.id}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete Sub-Admin Account"
                           >
-                            <span>Inspect</span>
-                            <ChevronRight size={13} />
+                            {deletingSubAdminId === s.id ? (
+                              <Loader2 size={14} className="animate-spin text-rose-600" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
                           </button>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -3557,60 +3815,241 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
         </div>
       )}
 
-      {/* 8. TAB: AUDIT TRAIL */}
-      {activeTab === "audit-logs" && (
+      {/* TAB: RESULTS & DYNAMIC RANKINGS */}
+      {activeTab === "results" && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <Shield size={18} className="text-[#1c1f58]" />
-                <span>Institutional System Audit Trail</span>
+                <Trophy size={18} className="text-amber-500" />
+                <span>AI Quest 2026 Results & Dynamic Leaderboard</span>
               </h2>
-              <p className="text-xs text-slate-500">Immutable timestamped audit log of administrative and evaluation actions</p>
+              <p className="text-xs text-slate-500">
+                Authoritative candidate scorecards, evaluated marks, and live tab switch violation telemetry.
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={fetchAuditLogs}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
-            >
-              <RefreshCw size={14} className={loadingAuditLogs ? "animate-spin" : ""} />
-              <span>Refresh Logs</span>
-            </button>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleExportResultsExcel}
+                disabled={isExportingResultsExcel || resultsData.length === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                {isExportingResultsExcel ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <FileSpreadsheet size={14} />
+                )}
+                <span>Download Results (.xlsx)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={fetchResults}
+                disabled={loadingResults}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+              >
+                <RefreshCw size={13} className={loadingResults ? "animate-spin" : ""} />
+                <span>Refresh</span>
+              </button>
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+          {/* Dynamic Top Filter Pills & Search */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {/* Dynamic Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1 flex items-center gap-1">
+                <Filter size={12} />
+                <span>Rank Filter:</span>
+              </span>
+              {[
+                { label: "All Results", val: "ALL" },
+                { label: "Top 10", val: "10" },
+                { label: "Top 20", val: "20" },
+                { label: "Top 50", val: "50" },
+                { label: "Top 100", val: "100" }
+              ].map((pill) => (
+                <button
+                  key={pill.val}
+                  type="button"
+                  onClick={() => setResultsTopFilter(pill.val)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    resultsTopFilter === pill.val
+                      ? "bg-[#1c1f58] text-white shadow-2xs scale-105"
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search & Sort Controls */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={resultsSearch}
+                  onChange={(e) => setResultsSearch(e.target.value)}
+                  placeholder="Search candidate, school, city..."
+                  className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58] bg-white w-48 sm:w-56"
+                />
+              </div>
+
+              <select
+                value={`${resultsSortBy}-${resultsOrder}`}
+                onChange={(e) => {
+                  const [sb, ord] = e.target.value.split("-");
+                  setResultsSortBy(sb);
+                  setResultsOrder(ord);
+                }}
+                className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58] bg-white text-slate-700"
+              >
+                <option value="score-desc">Highest Score First</option>
+                <option value="score-asc">Lowest Score First</option>
+                <option value="tabViolations-asc">Least Tab Switches (Cleanest)</option>
+                <option value="tabViolations-desc">Most Tab Switches (Violations)</option>
+                <option value="submittedAt-desc">Latest Submissions</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Results Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                    <th className="py-3 px-4">Timestamp</th>
-                    <th className="py-3 px-4">Admin</th>
-                    <th className="py-3 px-4">Action</th>
-                    <th className="py-3 px-4">Target</th>
-                    <th className="py-3 px-4">Details</th>
+                    <th className="py-3 px-4 text-center">Rank</th>
+                    <th className="py-3 px-4">Candidate Details</th>
+                    <th className="py-3 px-4">School & City</th>
+                    <th className="py-3 px-4">Assessment</th>
+                    <th className="py-3 px-4 text-center">Score / Total</th>
+                    <th className="py-3 px-4 text-center">Percentage</th>
+                    <th className="py-3 px-4 text-center">Tab Switches</th>
+                    <th className="py-3 px-4 text-center">Result</th>
+                    <th className="py-3 px-4">Submitted At</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {auditLogs.length === 0 ? (
+                  {loadingResults ? (
                     <tr>
-                      <td colSpan="5" className="py-8 text-center text-slate-400 font-semibold">
-                        No administrative actions logged yet.
+                      <td colSpan="9" className="py-12 text-center text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Loader2 size={24} className="animate-spin text-[#1c1f58]" />
+                          <span className="font-semibold text-xs">Computing candidate rankings & marks...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : resultsData.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" className="py-12 text-center text-slate-400 font-semibold">
+                        No evaluated results recorded yet.
                       </td>
                     </tr>
                   ) : (
-                    auditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3 px-4 text-slate-400 font-mono text-[11px] whitespace-nowrap">
-                          {log.createdAt ? new Date(log.createdAt).toLocaleString() : "-"}
+                    resultsData.map((r) => (
+                      <tr
+                        key={r.id}
+                        className={`hover:bg-slate-50/70 transition-colors ${
+                          r.rank === 1
+                            ? "bg-amber-50/40"
+                            : r.rank === 2
+                            ? "bg-slate-100/40"
+                            : r.rank === 3
+                            ? "bg-amber-100/20"
+                            : ""
+                        }`}
+                      >
+                        {/* Rank Badge */}
+                        <td className="py-3 px-4 text-center">
+                          {r.rank === 1 ? (
+                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400 text-amber-950 font-black text-xs shadow-2xs">
+                              🥇 1
+                            </span>
+                          ) : r.rank === 2 ? (
+                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300 text-slate-800 font-black text-xs shadow-2xs">
+                              🥈 2
+                            </span>
+                          ) : r.rank === 3 ? (
+                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-600 text-white font-black text-xs shadow-2xs">
+                              🥉 3
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-slate-100 font-mono font-bold text-slate-600 text-xs">
+                              #{r.rank}
+                            </span>
+                          )}
                         </td>
-                        <td className="py-3 px-4 font-bold text-slate-900 whitespace-nowrap">{log.adminName}</td>
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                            {log.action}
+
+                        {/* Candidate Details */}
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900">{r.name}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{r.registrationId}</div>
+                          <div className="text-[10px] text-slate-400">{r.mobileNo}</div>
+                        </td>
+
+                        {/* School & City */}
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-slate-800 max-w-[200px] truncate">{r.schoolName}</div>
+                          <div className="text-[10px] text-slate-500">{r.city} • {r.studentClass}</div>
+                        </td>
+
+                        {/* Assessment */}
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-slate-800">{r.quizTitle}</div>
+                        </td>
+
+                        {/* Score */}
+                        <td className="py-3 px-4 text-center font-black text-sm text-[#1c1f58]">
+                          {r.score} <span className="text-slate-400 text-xs font-normal">/ {r.totalMarks}</span>
+                        </td>
+
+                        {/* Percentage */}
+                        <td className="py-3 px-4 text-center font-bold text-slate-800">
+                          {r.percentage}%
+                        </td>
+
+                        {/* Tab Switch Count Badge */}
+                        <td className="py-3 px-4 text-center">
+                          {r.tabViolations === 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 size={11} />
+                              <span>0 Switches (Clean)</span>
+                            </span>
+                          ) : r.tabViolations <= 2 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <AlertTriangle size={11} />
+                              <span>{r.tabViolations} Switches</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
+                              <ShieldAlert size={11} />
+                              <span>{r.tabViolations} Switches (Flagged)</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Result Pass/Fail */}
+                        <td className="py-3 px-4 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              r.isPassed
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-rose-50 text-rose-700 border border-rose-200"
+                            }`}
+                          >
+                            {r.isPassed ? "PASSED" : "FAILED"}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-slate-500 uppercase text-[10px] font-bold whitespace-nowrap">{log.targetType}</td>
-                        <td className="py-3 px-4 text-slate-800 font-semibold max-w-md">{log.details}</td>
+
+                        {/* Submitted At */}
+                        <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
+                          {r.submittedAt ? new Date(r.submittedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) + ", " + new Date(r.submittedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "-"}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -3621,13 +4060,8 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
         </div>
       )}
 
-      {/* 10. TAB: QUESTION VAULT (Super Control Panel Central Bank) */}
-      {activeTab === "question-vault" && (
-        <QuestionVaultView isSuperAdmin={true} user={user} />
-      )}
-
-      {/* 9. TAB: ALL QUIZZES (Default) */}
-      {(activeTab === "quizzes" || (!["students", "courses", "submissions", "faculties", "live-monitor", "proctoring-rules", "accreditation", "audit-logs", "academic-structure", "question-vault"].includes(activeTab))) && (
+      {/* TAB: ALL QUIZZES (Default) */}
+      {(activeTab === "quizzes" || (!["students", "courses", "submissions", "create-subadmin", "faculties", "live-monitor", "proctoring-rules", "academic-structure", "create-quiz", "results"].includes(activeTab))) && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-base font-black text-slate-900">All Created Quizzes</h2>

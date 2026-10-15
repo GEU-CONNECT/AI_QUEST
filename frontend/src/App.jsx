@@ -24,8 +24,10 @@ export default function App() {
   useEffect(() => {
     if (user?.role === "STUDENT" && activeTab === "quizzes") {
       setActiveTab("active");
+    } else if (user?.role === "SUBADMIN" && (activeTab === "quizzes" || !["candidate-lockouts", "live-monitor"].includes(activeTab))) {
+      setActiveTab("candidate-lockouts");
     }
-  }, [user]);
+  }, [user, activeTab]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem("quizx_token");

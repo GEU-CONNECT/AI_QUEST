@@ -43,6 +43,11 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/proctoring', proctoringRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Fallback compatibility route for courses
+app.get('/api/courses', (req, res) => {
+  res.json({ success: true, courses: [] });
+});
+
 // Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error('[AI Quest Error]', err);

@@ -45,7 +45,8 @@ const PortalLayout = ({
   const dropdownRef = useRef(null);
 
   const isAdmin = user?.role === 'ADMIN';
-  const isFaculty = user?.role === 'FACULTY' || user?.role === 'COURSE_CREATOR' || user?.role === 'SUBADMIN';
+  const isSubAdmin = user?.role === 'SUBADMIN';
+  const isFaculty = user?.role === 'FACULTY' || user?.role === 'COURSE_CREATOR';
   const isStudent = user?.role === 'STUDENT';
 
   // Close dropdown on outside click
@@ -75,7 +76,7 @@ const PortalLayout = ({
   const handleNavItemClick = (itemId) => {
     if (onTabChange) onTabChange(itemId);
     setIsMobileMenuOpen(false);
-    const roleHome = isAdmin ? "/admin" : isFaculty ? "/faculty" : "/student";
+    const roleHome = isAdmin ? "/admin" : (isFaculty || isSubAdmin) ? "/faculty" : "/student";
     if (location.pathname !== roleHome) {
       navigate(roleHome);
     }
@@ -83,24 +84,29 @@ const PortalLayout = ({
 
   const navItems = [];
 
-  if (isAdmin) {
+  if (isSubAdmin) {
+    // Lab Sub-Admins: Strictly restricted to Candidate Unlock / Reset & Live Monitor
+    navItems.push(
+      { id: 'candidate-lockouts', name: 'Unlock / Reset Candidates', icon: <Unlock size={18} /> },
+      { id: 'live-monitor', name: 'Live Exam Monitor', icon: <Activity size={18} /> }
+    );
+  } else if (isAdmin) {
+    // Super Administrator: Full Governance & Assessment Management
     navItems.push(
       { id: 'students', name: 'Registered Candidates', icon: <Users size={18} /> },
+      { id: 'create-quiz', name: 'Create Quiz', icon: <PlusCircle size={18} /> },
       { id: 'quizzes', name: 'All Quizzes', icon: <CheckSquare size={18} /> },
-      { id: 'question-vault', name: 'Question Vault', icon: <Archive size={18} /> },
+      { id: 'results', name: 'Results & Rankings', icon: <Award size={18} /> },
+      { id: 'submissions', name: 'Submissions', icon: <FileText size={18} /> },
+      { id: 'create-subadmin', name: 'Create Sub-Admins', icon: <Building2 size={18} /> },
       { id: 'live-monitor', name: 'Live Monitor', icon: <Activity size={18} /> },
       { id: 'proctoring-rules', name: 'Proctoring Rules', icon: <ShieldAlert size={18} /> },
       { id: 'courses', name: 'Subjects', icon: <BookOpen size={18} /> },
-      { id: 'submissions', name: 'Submissions', icon: <FileText size={18} /> },
-      { id: 'faculties', name: 'Lab Sub-Admins', icon: <Building2 size={18} /> },
-      { id: 'accreditation', name: 'NAAC / NBA Audit', icon: <Award size={18} /> },
-      { id: 'audit-logs', name: 'Audit Trail', icon: <Shield size={18} /> },
-      { id: 'academic-structure', name: 'Academic Setup', icon: <Building2 size={18} /> }
+      { id: 'academic-structure', name: 'Academic Setup', icon: <GraduationCap size={18} /> }
     );
   } else if (isFaculty) {
     navItems.push(
       { id: 'quizzes', name: 'My Quizzes', icon: <CheckSquare size={18} /> },
-      { id: 'question-vault', name: 'Question Vault', icon: <Archive size={18} /> },
       { id: 'create-quiz', name: 'Create Quiz', icon: <PlusCircle size={18} /> },
       { id: 'candidate-lockouts', name: 'Unlock Sessions', icon: <Unlock size={18} /> },
       { id: 'courses', name: 'Subjects', icon: <BookOpen size={18} /> },
