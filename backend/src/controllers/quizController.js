@@ -85,6 +85,7 @@ const getQuiz = async (req, res, next) => {
     if (isStudent && !quiz.isLive) {
       return res.status(403).json({
         success: false,
+        isClosed: true,
         message: 'This assessment is currently closed by the examination authority.'
       });
     }

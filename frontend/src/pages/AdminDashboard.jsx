@@ -49,7 +49,9 @@ import {
   Copy,
   Filter,
   Trophy,
-  UserPlus
+  UserPlus,
+  EyeOff,
+  Radio
 } from "lucide-react";
 import api from "../api/client";
 import CreateQuizView from "../components/CreateQuizView";
@@ -84,6 +86,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [quizSearch, setQuizSearch] = useState("");
   const [facultyFilter, setFacultyFilter] = useState("ALL");
   const [courseFilter, setCourseFilter] = useState("ALL");
+  const [quizStatusFilter, setQuizStatusFilter] = useState("ALL");
   const [submissionSearch, setSubmissionSearch] = useState("");
   const [submissionPage, setSubmissionPage] = useState(1);
   const [submissionLimit, setSubmissionLimit] = useState(25);
@@ -762,6 +765,19 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     }
   };
 
+  const handleToggleLive = async (quizId) => {
+    try {
+      const res = await api.patch(`/quizzes/${quizId}/toggle-live`);
+      if (res.data?.success) {
+        setQuizzes((prev) =>
+          prev.map((q) => (q.id === quizId ? { ...q, isLive: res.data.isLive } : q))
+        );
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to toggle assessment live status");
+    }
+  };
+
   // CSV Export for submissions ledger
   const handleExportLedgerCSV = () => {
     if (!filteredSubmissions.length) return;
@@ -1241,8 +1257,12 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
 
     const matchesFaculty = facultyFilter === "ALL" || q.creator?.name === facultyFilter;
     const matchesCourse = courseFilter === "ALL" || q.course?.code === courseFilter;
+    const matchesStatus =
+      quizStatusFilter === "ALL" ||
+      (quizStatusFilter === "LIVE" && q.isLive !== false) ||
+      (quizStatusFilter === "CLOSED" && q.isLive === false);
 
-    return matchesSearch && matchesFaculty && matchesCourse;
+    return matchesSearch && matchesFaculty && matchesCourse && matchesStatus;
   });
 
   // Filtered Submissions
@@ -4206,6 +4226,16 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
+
+              <select
+                value={quizStatusFilter}
+                onChange={(e) => setQuizStatusFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white"
+              >
+                <option value="ALL">All Status</option>
+                <option value="LIVE">Live (Open)</option>
+                <option value="CLOSED">Closed (Hidden)</option>
+              </select>
             </div>
           </div>
 
@@ -4217,9 +4247,25 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100">
-                      {q.course?.code || "CSE"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {q.course?.code || "CSE"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLive(q.id)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                          q.isLive !== false
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100'
+                            : 'bg-rose-50 text-rose-700 border border-rose-300 hover:bg-rose-100'
+                        }`}
+                        title={q.isLive !== false ? "Assessment is LIVE and visible to all candidates. Click to CLOSE." : "Assessment is CLOSED and hidden from candidates. Click to make LIVE."}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${q.isLive !== false ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                        <span>{q.isLive !== false ? 'LIVE NOW' : 'CLOSED'}</span>
+                      </button>
+                    </div>
+
                     <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
                       <Clock size={13} />
                       {q.durationMinutes} mins
@@ -4235,6 +4281,18 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                     </div>
                   </div>
 
+                  {q.isLive === false ? (
+                    <div className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[10px] font-bold text-rose-800 flex items-center gap-1.5">
+                      <EyeOff size={12} className="text-rose-600 shrink-0" />
+                      <span>Exam is CLOSED — Hidden from students</span>
+                    </div>
+                  ) : (
+                    <div className="px-2.5 py-1 rounded-lg bg-emerald-50/70 border border-emerald-200 text-[10px] font-bold text-emerald-800 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                      <span>Exam is LIVE — Visible to all students</span>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3 pt-2 text-[11px] font-semibold text-slate-500 border-t border-slate-100">
                     <div>
                       <span className="text-slate-400">Questions: </span>
@@ -4248,6 +4306,20 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
 
                   {/* Super Admin Action Strip */}
                   <div className="pt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleLive(q.id)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                        q.isLive !== false
+                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      }`}
+                      title={q.isLive !== false ? "Close Exam (Hide from all students)" : "Make Exam Live (Visible to all students)"}
+                    >
+                      {q.isLive !== false ? <EyeOff size={11} /> : <Radio size={11} className="animate-pulse" />}
+                      <span>{q.isLive !== false ? 'Close Exam' : 'Make Live'}</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleOpenRegradeModal(q)}
