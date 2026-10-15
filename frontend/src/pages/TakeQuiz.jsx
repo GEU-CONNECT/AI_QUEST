@@ -618,37 +618,7 @@ const TakeQuiz = ({ user }) => {
       }
     };
 
-    // Standard Window Blur (Verifies true focus loss to prevent DOM/extension false positives)
-    let blurTimer = null;
-    const handleWindowBlur = () => {
-      if (blurTimer) clearTimeout(blurTimer);
-
-      // Grace period after fullscreen toggle to let browser notification banner clear
-      if (Date.now() < fullscreenGraceRef.current) return;
-
-      // Debounce window blur by 1500ms to verify if candidate truly switched applications
-      blurTimer = setTimeout(() => {
-        // If tab is actually hidden, visibilitychange handles it instantly
-        if (document.hidden) return;
-
-        // If the document currently has focus, it was an internal click or DOM focus shift
-        if (document.hasFocus && document.hasFocus()) return;
-
-        // Candidate has truly focused another application outside the browser
-        applyImmediateBlackout(true);
-        setIsFocusLost(true);
-        if (!hasLeftWindowRef.current) {
-          hasLeftWindowRef.current = true;
-          recordFocusViolation("Window blur / switched application");
-        }
-      }, 1500);
-    };
-
     const handleWindowFocus = () => {
-      if (blurTimer) {
-        clearTimeout(blurTimer);
-        blurTimer = null;
-      }
       hasLeftWindowRef.current = false;
       applyImmediateBlackout(false);
       setIsFocusLost(false);
@@ -734,7 +704,6 @@ const TakeQuiz = ({ user }) => {
     rafId = requestAnimationFrame(rafCheck);
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", handleWindowBlur);
     window.addEventListener("focus", handleWindowFocus);
     window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("pageshow", handlePageShow);
@@ -746,7 +715,6 @@ const TakeQuiz = ({ user }) => {
       clearTimeout(initTimer);
       if (rafId) cancelAnimationFrame(rafId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", handleWindowBlur);
       window.removeEventListener("focus", handleWindowFocus);
       window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("pageshow", handlePageShow);
@@ -1979,15 +1947,11 @@ const TakeQuiz = ({ user }) => {
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Live Integrity Status Badge */}
           <div
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-black transition-all ${
-              tabViolations > 0
-                ? 'bg-rose-50 text-rose-700 border-rose-300 animate-pulse'
-                : 'bg-slate-50 text-slate-500 border-slate-200'
-            }`}
-            title="Real-time proctoring integrity active"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold bg-slate-50 text-slate-600 border-slate-200"
+            title="Institutional proctoring actively safeguarding examination integrity"
           >
-            <ShieldAlert size={14} className={tabViolations > 0 ? 'text-rose-600' : 'text-slate-400'} />
-            <span>{tabViolations > 0 ? 'Proctoring Flagged' : 'AI Proctored'}</span>
+            <ShieldCheck size={14} className="text-emerald-600" />
+            <span>AI Proctored</span>
           </div>
 
           {quiz.timingMode === 'STRICT' && (
