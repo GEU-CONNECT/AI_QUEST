@@ -419,15 +419,20 @@ const submitQuiz = async (req, res, next) => {
         parsedOpts = [q.options];
       }
 
+      const marksAwarded = isCorrect ? q.marks : (isAttempted && quiz.negativeMarking ? -(quiz.negativeMarksPerWrong || 0.25) : 0);
+
       return {
         questionId: q.id,
         order: q.order,
         questionText: q.questionText,
-        options: parsedOpts,
+        options: Array.isArray(parsedOpts) ? parsedOpts : [],
         selectedOptionIndex: isAttempted ? Number(ans) : null,
-        correctOptionIndex: q.correctOptionIndex,
+        studentSelected: isAttempted ? Number(ans) : null,
+        correctOptionIndex: Number(q.correctOptionIndex),
+        isAttempted,
         isCorrect,
         marks: q.marks,
+        marksAwarded,
         explanation: q.explanation
       };
     });

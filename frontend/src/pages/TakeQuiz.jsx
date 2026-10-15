@@ -22,7 +22,8 @@ import {
   Image as ImageIcon,
   Maximize2,
   BookOpen,
-  Type
+  Type,
+  FileText
 } from 'lucide-react';
 import api from '../api/client';
 import { getSafeImageUrl } from '../utils/imageUrl';
