@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
-  ShieldCheck,
   RotateCcw,
   Edit3,
   List,
@@ -425,10 +424,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
         {/* Top Header Strip */}
         <div className="form-card-header layer-3d-front">
           <div className="form-title-group">
-            <div className="form-badge-pill">
-              <span className="live-dot"></span>
-              GRAPHIC ERA UNIVERSITY • AI QUEST 2026 OFFICIAL REGISTRATION
-            </div>
             <h2 className="form-title">Quester Application Form</h2>
           </div>
 
@@ -1152,7 +1147,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     <AlertCircle size={13} /> {errors.parentContact}
                   </div>
                 ) : (
-                  <div className="field-sub-note">Parent mobile for emergency updates</div>
+                  <div className="field-sub-note note-warning">should not be same as personal number</div>
                 )}
               </div>
             </div>
@@ -1160,13 +1155,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
 
           {/* Form Submission Button */}
           <div className="submit-action-area layer-3d-front">
-            <div className="submission-disclaimer">
-              <ShieldCheck size={18} className="disclaimer-icon" />
-              <span>
-                Official Graphic Era University AI Quest 2026 Portal • Instant admit card pass generation.
-              </span>
-            </div>
-
             <button
               type="submit"
               disabled={isSubmitting}
