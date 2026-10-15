@@ -618,19 +618,37 @@ const TakeQuiz = ({ user }) => {
       }
     };
 
-    // Standard Window Blur (Fires when browser window loses focus to an external app)
+    // Standard Window Blur (Verifies true focus loss to prevent DOM/extension false positives)
+    let blurTimer = null;
     const handleWindowBlur = () => {
-      // Small 600ms grace window after user initiates fullscreen to let browser repaint
+      if (blurTimer) clearTimeout(blurTimer);
+
+      // Grace period after fullscreen toggle to let browser notification banner clear
       if (Date.now() < fullscreenGraceRef.current) return;
-      applyImmediateBlackout(true);
-      setIsFocusLost(true);
-      if (!hasLeftWindowRef.current) {
-        hasLeftWindowRef.current = true;
-        recordFocusViolation("Window blur / switched application");
-      }
+
+      // Debounce window blur by 1500ms to verify if candidate truly switched applications
+      blurTimer = setTimeout(() => {
+        // If tab is actually hidden, visibilitychange handles it instantly
+        if (document.hidden) return;
+
+        // If the document currently has focus, it was an internal click or DOM focus shift
+        if (document.hasFocus && document.hasFocus()) return;
+
+        // Candidate has truly focused another application outside the browser
+        applyImmediateBlackout(true);
+        setIsFocusLost(true);
+        if (!hasLeftWindowRef.current) {
+          hasLeftWindowRef.current = true;
+          recordFocusViolation("Window blur / switched application");
+        }
+      }, 1500);
     };
 
     const handleWindowFocus = () => {
+      if (blurTimer) {
+        clearTimeout(blurTimer);
+        blurTimer = null;
+      }
       hasLeftWindowRef.current = false;
       applyImmediateBlackout(false);
       setIsFocusLost(false);
@@ -917,7 +935,7 @@ const TakeQuiz = ({ user }) => {
 
       if (isFull) {
         wasInFullscreenRef.current = true;
-        fullscreenGraceRef.current = Date.now() + 600;
+        fullscreenGraceRef.current = Date.now() + 1500;
         hasLeftWindowRef.current = false;
         applyImmediateBlackout(false);
         setIsFocusLost(false);
@@ -929,10 +947,12 @@ const TakeQuiz = ({ user }) => {
           }
         } catch (_) {}
       } else {
+        const wasInFull = wasInFullscreenRef.current;
         wasInFullscreenRef.current = false;
 
-        // Trigger exit infraction whenever candidate exits fullscreen during active assessment
+        // Trigger exit infraction ONLY if candidate was ACTUALLY inside fullscreen mode
         if (
+          wasInFull &&
           proctoringRules.enforceFullscreen &&
           !loading &&
           !accessRequired &&
