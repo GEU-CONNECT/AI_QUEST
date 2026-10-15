@@ -1015,45 +1015,98 @@ const exportResultsExcel = async (req, res, next) => {
 // @route   POST /api/admin/reset-system-data
 const resetSystemData = async (req, res, next) => {
   try {
-    // 1. Delete all submissions
-    const deletedSubmissions = await prisma.quizSubmission.deleteMany();
+    const isSelective = req.body && Object.keys(req.body).length > 0;
+    const shouldDeleteStudents = isSelective ? Boolean(req.body.deleteStudents) : true;
+    const shouldDeleteSubAdmins = isSelective ? Boolean(req.body.deleteSubAdmins) : false;
+    const shouldDeleteQuizzes = isSelective ? Boolean(req.body.deleteQuizzes) : true;
+    const shouldDeleteSubmissions = isSelective ? Boolean(req.body.deleteSubmissions) : true;
+    const shouldDeleteCourses = isSelective ? Boolean(req.body.deleteCourses) : true;
 
-    // 2. Delete all questions
-    const deletedQuestions = await prisma.question.deleteMany();
+    let deletedSubmissionsCount = 0;
+    let deletedQuestionsCount = 0;
+    let deletedQuizzesCount = 0;
+    let deletedCoursesCount = 0;
+    let deletedStudentsCount = 0;
+    let deletedSubAdminsCount = 0;
 
-    // 3. Delete all quizzes
-    const deletedQuizzes = await prisma.quiz.deleteMany();
-
-    // 4. Delete all subjects/courses
-    const deletedCourses = await prisma.course.deleteMany();
-
-    // 5. Delete all non-admin users (both dummy students and sub-admins for testing)
-    const deletedUsers = await prisma.user.deleteMany({
-      where: {
-        role: {
-          not: 'ADMIN'
+    // 1. Delete Submissions (must precede quizzes or students deletion to maintain referential integrity)
+    if (shouldDeleteSubmissions || shouldDeleteQuizzes) {
+      const resSub = await prisma.quizSubmission.deleteMany();
+      deletedSubmissionsCount = resSub.count;
+    } else if (shouldDeleteStudents) {
+      const resSub = await prisma.quizSubmission.deleteMany({
+        where: {
+          student: {
+            role: 'STUDENT'
+          }
         }
-      }
-    });
+      });
+      deletedSubmissionsCount = resSub.count;
+    }
 
-    // 6. Delete all audit logs
-    await prisma.adminAuditLog.deleteMany();
+    // 2. Delete Quizzes and Questions
+    if (shouldDeleteQuizzes) {
+      const resQuestions = await prisma.question.deleteMany();
+      deletedQuestionsCount = resQuestions.count;
+      const resQuizzes = await prisma.quiz.deleteMany();
+      deletedQuizzesCount = resQuizzes.count;
+    }
 
-    // Verify admin accounts still intact
+    // 3. Delete Courses / Subjects
+    if (shouldDeleteCourses) {
+      const resCourses = await prisma.course.deleteMany();
+      deletedCoursesCount = resCourses.count;
+    }
+
+    // 4. Delete Registered Students (role: 'STUDENT')
+    if (shouldDeleteStudents) {
+      const resStudents = await prisma.user.deleteMany({
+        where: {
+          role: 'STUDENT'
+        }
+      });
+      deletedStudentsCount = resStudents.count;
+    }
+
+    // 5. Delete Sub-Admins (role: 'SUBADMIN')
+    if (shouldDeleteSubAdmins) {
+      const resSubAdmins = await prisma.user.deleteMany({
+        where: {
+          role: 'SUBADMIN'
+        }
+      });
+      deletedSubAdminsCount = resSubAdmins.count;
+    }
+
+    // 6. Delete audit logs if any major module was purged
+    if (shouldDeleteQuizzes || shouldDeleteStudents || shouldDeleteSubmissions) {
+      await prisma.adminAuditLog.deleteMany();
+    }
+
+    // Verify preserved counts
     const preservedAdminsCount = await prisma.user.count({
       where: { role: 'ADMIN' }
+    });
+    const preservedStudentsCount = await prisma.user.count({
+      where: { role: 'STUDENT' }
+    });
+    const preservedSubAdminsCount = await prisma.user.count({
+      where: { role: 'SUBADMIN' }
     });
 
     res.json({
       success: true,
-      message: 'System data reset successfully. All dummy quizzes, subjects, submissions, sub-admins, and test students have been purged. Clean slate ready for fresh testing.',
+      message: 'Selected system data reset successfully.',
       stats: {
-        deletedQuizzes: deletedQuizzes.count,
-        deletedCourses: deletedCourses.count,
-        deletedUsers: deletedUsers.count,
-        deletedSubmissions: deletedSubmissions.count,
-        deletedQuestions: deletedQuestions.count,
-        preservedAdminsCount
+        deletedQuizzes: deletedQuizzesCount,
+        deletedCourses: deletedCoursesCount,
+        deletedStudents: deletedStudentsCount,
+        deletedSubAdmins: deletedSubAdminsCount,
+        deletedSubmissions: deletedSubmissionsCount,
+        deletedQuestions: deletedQuestionsCount,
+        preservedAdminsCount,
+        preservedStudentsCount,
+        preservedSubAdminsCount
       }
     });
   } catch (error) {

@@ -202,11 +202,18 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [isImportingBulk, setIsImportingBulk] = useState(false);
   const [bulkImportMessage, setBulkImportMessage] = useState("");
 
-  // Full System Reset State (Preserves Registered Students & Admin)
+  // Selective System Reset State
   const [isSystemResetModalOpen, setIsSystemResetModalOpen] = useState(false);
   const [systemResetConfirmText, setSystemResetConfirmText] = useState("");
   const [isResettingSystem, setIsResettingSystem] = useState(false);
   const [systemResetResultMsg, setSystemResetResultMsg] = useState("");
+  const [resetSelections, setResetSelections] = useState({
+    deleteStudents: true,
+    deleteSubAdmins: false, // Default unchecked to keep created Sub-Admin IDs safe!
+    deleteQuizzes: true,
+    deleteSubmissions: true,
+    deleteCourses: true
+  });
 
   // 7. NAAC / NBA Accreditation Report State
 
@@ -1333,6 +1340,11 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   };
 
   const handleResetSystemData = async () => {
+    const hasSelection = Object.values(resetSelections).some(Boolean);
+    if (!hasSelection) {
+      alert("Please select at least one data module checkbox to purge.");
+      return;
+    }
     if (systemResetConfirmText.trim().toUpperCase() !== "RESET") {
       alert("Please type RESET in capital letters to confirm system purge.");
       return;
@@ -1340,7 +1352,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     try {
       setIsResettingSystem(true);
       setSystemResetResultMsg("");
-      const res = await api.post("/admin/reset-system-data");
+      const res = await api.post("/admin/reset-system-data", resetSelections);
       if (res.data.success) {
         setSystemResetResultMsg(res.data.message);
         await Promise.allSettled([
@@ -5955,9 +5967,9 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                   <Trash2 size={24} className="text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black tracking-tight">Full System Test Reset</h3>
+                  <h3 className="text-lg font-black tracking-tight">System Data Reset Console</h3>
                   <p className="text-xs text-rose-100 font-medium">
-                    Clean slate: purge dummy students, quizzes, subjects & sub-admins
+                    Selectively choose modules to purge or preserve for testing
                   </p>
                 </div>
               </div>
@@ -5966,45 +5978,154 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
             {/* Body */}
             <div className="p-6 space-y-4 text-xs">
               {/* Green Safety Guarantee for Admin */}
-              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
-                <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-2.5">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-black text-emerald-900 text-xs">
                     Admin Account Login Stays 100% Safe
                   </div>
-                  <div className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed font-medium">
-                    Your super-admin login credentials will <b>never</b> be deleted or modified so you remain securely logged in.
+                  <div className="text-[11px] text-emerald-700 leading-tight font-medium">
+                    Your super-admin account credentials will <b>never</b> be deleted or locked out.
                   </div>
                 </div>
               </div>
 
-              {/* What will be deleted */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                  The following items will be completely erased:
+              {/* Checkbox Selection Grid */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                    Select Data Modules to Delete:
+                  </span>
+                  <div className="flex items-center gap-2 text-[10px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setResetSelections({
+                        deleteStudents: true,
+                        deleteSubAdmins: true,
+                        deleteQuizzes: true,
+                        deleteSubmissions: true,
+                        deleteCourses: true
+                      })}
+                      className="text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setResetSelections({
+                        deleteStudents: false,
+                        deleteSubAdmins: false,
+                        deleteQuizzes: false,
+                        deleteSubmissions: false,
+                        deleteCourses: false
+                      })}
+                      className="text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  </div>
                 </div>
-                <ul className="space-y-1.5 text-slate-600 font-medium pl-1">
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-                    <span className="font-bold text-rose-700">All Registered Students (role = 'STUDENT')</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-                    <span>All Sub-Admin accounts created during testing</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-                    <span>All Quizzes, Questions & Options</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-                    <span>All Quiz Submissions & test attempts</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-                    <span>All dummy Courses / Subjects</span>
-                  </li>
-                </ul>
+
+                <div className="space-y-1.5">
+                  {/* 1. Sub-Admin Accounts */}
+                  <label className={`flex items-start gap-2.5 p-2 rounded-xl transition-all cursor-pointer border ${!resetSelections.deleteSubAdmins ? 'bg-emerald-50/70 border-emerald-200' : 'bg-rose-50/50 border-rose-200'}`}>
+                    <input
+                      type="checkbox"
+                      checked={resetSelections.deleteSubAdmins}
+                      onChange={(e) => setResetSelections(prev => ({ ...prev, deleteSubAdmins: e.target.checked }))}
+                      className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 text-xs flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <span>Sub-Admin Accounts (<code className="text-slate-700 font-mono text-[10px]">role='SUBADMIN'</code>)</span>
+                          {!resetSelections.deleteSubAdmins ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-600 text-white">
+                              SAFE / PRESERVED
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white">
+                              WILL BE DELETED
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-400">{subAdmins?.length || 0} IDs</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        {!resetSelections.deleteSubAdmins ? "Unchecked: Your created sub-admin invigilator credentials will remain saved." : "Checked: Sub-admin accounts created for testing will be permanently erased."}
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* 2. Registered Students */}
+                  <label className={`flex items-start gap-2.5 p-2 rounded-xl transition-all cursor-pointer border ${resetSelections.deleteStudents ? 'bg-rose-50/40 border-rose-200' : 'bg-white border-slate-200'}`}>
+                    <input
+                      type="checkbox"
+                      checked={resetSelections.deleteStudents}
+                      onChange={(e) => setResetSelections(prev => ({ ...prev, deleteStudents: e.target.checked }))}
+                      className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 text-xs flex items-center justify-between">
+                        <span>Registered Students (<code className="text-slate-700 font-mono text-[10px]">role='STUDENT'</code>)</span>
+                        <span className="text-[10px] font-semibold text-slate-400">{overviewStats?.totalStudents || 0} students</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Delete candidate registration profiles, logins and rosters</p>
+                    </div>
+                  </label>
+
+                  {/* 3. Quizzes & Questions */}
+                  <label className={`flex items-start gap-2.5 p-2 rounded-xl transition-all cursor-pointer border ${resetSelections.deleteQuizzes ? 'bg-rose-50/40 border-rose-200' : 'bg-white border-slate-200'}`}>
+                    <input
+                      type="checkbox"
+                      checked={resetSelections.deleteQuizzes}
+                      onChange={(e) => setResetSelections(prev => ({ ...prev, deleteQuizzes: e.target.checked }))}
+                      className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 text-xs flex items-center justify-between">
+                        <span>Quizzes, Questions & Options</span>
+                        <span className="text-[10px] font-semibold text-slate-400">{overviewStats?.totalQuizzes || 0} quizzes</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Delete test papers, questions, marks & answer keys</p>
+                    </div>
+                  </label>
+
+                  {/* 4. Submissions & Test Attempts */}
+                  <label className={`flex items-start gap-2.5 p-2 rounded-xl transition-all cursor-pointer border ${resetSelections.deleteSubmissions ? 'bg-rose-50/40 border-rose-200' : 'bg-white border-slate-200'}`}>
+                    <input
+                      type="checkbox"
+                      checked={resetSelections.deleteSubmissions}
+                      onChange={(e) => setResetSelections(prev => ({ ...prev, deleteSubmissions: e.target.checked }))}
+                      className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 text-xs flex items-center justify-between">
+                        <span>Quiz Submissions & Candidate Scores</span>
+                        <span className="text-[10px] font-semibold text-slate-400">{overviewStats?.totalSubmissions || 0} attempts</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Wipe candidate test evaluations, answers, and violation counters</p>
+                    </div>
+                  </label>
+
+                  {/* 5. Courses & Subjects */}
+                  <label className={`flex items-start gap-2.5 p-2 rounded-xl transition-all cursor-pointer border ${resetSelections.deleteCourses ? 'bg-rose-50/40 border-rose-200' : 'bg-white border-slate-200'}`}>
+                    <input
+                      type="checkbox"
+                      checked={resetSelections.deleteCourses}
+                      onChange={(e) => setResetSelections(prev => ({ ...prev, deleteCourses: e.target.checked }))}
+                      className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 text-xs flex items-center justify-between">
+                        <span>Dummy Subjects / Courses</span>
+                        <span className="text-[10px] font-semibold text-slate-400">{courses?.length || 0} courses</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Delete academic courses and subjects catalog</p>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               {/* Confirmation Input */}
@@ -6046,18 +6167,18 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
               <button
                 type="button"
                 onClick={handleResetSystemData}
-                disabled={systemResetConfirmText.trim().toUpperCase() !== "RESET" || isResettingSystem}
+                disabled={systemResetConfirmText.trim().toUpperCase() !== "RESET" || isResettingSystem || !Object.values(resetSelections).some(Boolean)}
                 className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-sm transition-all cursor-pointer active:scale-95"
               >
                 {isResettingSystem ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    <span>Purging Data...</span>
+                    <span>Purging Selected Data...</span>
                   </>
                 ) : (
                   <>
                     <Trash2 size={14} />
-                    <span>Erase Data & Clean Slate</span>
+                    <span>Purge Selected Data</span>
                   </>
                 )}
               </button>
