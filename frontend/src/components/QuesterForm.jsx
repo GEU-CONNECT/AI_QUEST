@@ -60,14 +60,6 @@ export const SCHOOL_LIST = [
   'Roorkee Public School, Roorkee',
 ];
 
-const CLASS_OPTIONS = [
-  'Class 9th',
-  'Class 10th',
-  'Class 11th',
-  'Class 12th',
-  'Dropper / Competitive Prep',
-];
-
 const STREAM_OPTIONS = [
   'Science (PCM - Physics, Chem, Math)',
   'Science (PCB - Physics, Chem, Biology)',
@@ -75,8 +67,6 @@ const STREAM_OPTIONS = [
   'Commerce with Maths',
   'Commerce without Maths',
   'Humanities & Arts',
-  'Computer Science & AI Tech',
-  'General Secondary (Class 9-10)',
 ];
 
 
@@ -96,6 +86,13 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
   const section2Ref = useRef(null);
   const section3Ref = useRef(null);
   const schoolDropdownRef = useRef(null);
+
+  // Ensure studentClass is permanently locked to Class 12th
+  useEffect(() => {
+    if (formData.studentClass !== 'Class 12th') {
+      setFormData((prev) => ({ ...prev, studentClass: 'Class 12th' }));
+    }
+  }, [formData.studentClass, setFormData]);
 
   // Close school dropdown when clicking outside
   useEffect(() => {
@@ -194,7 +191,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
   const isCityValid = Boolean(formData.city && formData.city.trim().length > 0);
 
   const isSchoolValid = Boolean(formData.schoolName && formData.schoolName.trim().length >= 3);
-  const isClassValid = Boolean(formData.studentClass && formData.studentClass.trim().length > 0);
+  const isClassValid = true; // Permanently fixed to Class 12th
   const isStreamValid = Boolean(formData.stream && formData.stream.trim().length > 0);
 
   const isParentNameValid = Boolean(formData.parentName && formData.parentName.trim().length >= 2);
@@ -279,7 +276,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
           error = 'Enter a valid email address (e.g. name@domain.com)';
         break;
       case 'studentClass':
-        if (!cleanVal) error = 'Please select candidate class';
+        // Permanently fixed to Class 12th - always valid
         break;
       case 'stream':
         if (!cleanVal) error = 'Please select your stream';
@@ -847,6 +844,8 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     {isSchoolDropdownOpen && (
                       <div
                         className="school-custom-dropdown-panel"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {/* Search Filter Header */}
@@ -878,7 +877,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                           )}
                         </div>
 
-
                         {/* Scrollable List of Schools */}
                         <div className="school-options-scrollable">
                           {filteredSchools.length > 0 ? (
@@ -890,11 +888,17 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                                 const cityTag = parts.length > 1 ? parts.slice(1).join(',').trim() : '';
 
                                 return (
-                                  <div
+                                  <button
+                                    type="button"
                                     key={sch}
                                     className={`school-custom-option-item ${
                                       isSelected ? 'is-selected' : ''
                                     }`}
+                                    onPointerDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSelectSchool(sch);
+                                    }}
                                     onMouseDown={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -918,13 +922,19 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                                         <Check size={16} className="option-check-icon" />
                                       )}
                                     </div>
-                                  </div>
+                                  </button>
                                 );
                               })}
 
                               {/* Bottom Fallback Option */}
-                              <div
+                              <button
+                                type="button"
                                 className="school-bottom-manual-item"
+                                onPointerDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleSwitchToManual();
+                                }}
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -938,7 +948,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                               >
                                 <Edit3 size={15} />
                                 <span>➕ School not listed above? Enter manually</span>
-                              </div>
+                              </button>
                             </>
                           ) : (
                             <div className="school-no-matches-box">
@@ -946,6 +956,11 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                               <button
                                 type="button"
                                 className="enter-searched-school-btn"
+                                onPointerDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleSwitchToManual(schoolSearchQuery);
+                                }}
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -974,43 +989,24 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                 )}
               </div>
 
-              {/* 4. Class */}
-              <div
-                className={`form-field-group half-width ${
-                  activeField === 'studentClass' ? 'is-focused' : ''
-                } ${touched.studentClass && errors.studentClass ? 'has-error' : ''} ${
-                  isClassValid ? 'is-valid' : ''
-                }`}
-              >
+              {/* 4. Class - Fixed to Class 12th (No dropdown options) */}
+              <div className="form-field-group half-width is-valid">
                 <label htmlFor="studentClass">
                   Class <span className="req-star">*</span>
                 </label>
-                <div className="input-wrap select-wrap">
+                <div className="input-wrap input-wrap-locked">
                   <GraduationCap size={18} className="field-icon" />
-                  <select
+                  <input
+                    type="text"
                     id="studentClass"
                     name="studentClass"
-                    value={formData.studentClass}
-                    onChange={handleChange}
-                    onFocus={() => handleFocus('studentClass')}
-                    onBlur={handleBlur}
-                  >
-                    <option value="">Select Class...</option>
-                    {CLASS_OPTIONS.map((cls) => (
-                      <option key={cls} value={cls}>
-                        {cls}
-                      </option>
-                    ))}
-                  </select>
-                  {isClassValid && (
-                    <CheckCircle2 size={18} className="field-valid-icon select-check" />
-                  )}
+                    value="Class 12th"
+                    readOnly
+                    className="locked-input-field"
+                    title="Fixed to Class 12th"
+                  />
+                  <CheckCircle2 size={18} className="field-valid-icon" />
                 </div>
-                {touched.studentClass && errors.studentClass && (
-                  <div className="error-msg">
-                    <AlertCircle size={13} /> {errors.studentClass}
-                  </div>
-                )}
               </div>
 
               {/* 5. Stream */}

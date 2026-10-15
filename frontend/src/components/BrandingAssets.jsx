@@ -1,19 +1,25 @@
 import React from 'react';
 
-// Graphic Era University Official Logo
+// Graphic Era University Official Logo using /image.png
 export function GraphicEraLogo({ className = '' }) {
   return (
     <div className={`geu-branding-container ${className}`}>
-      <div className="geu-official-logo-wrapper">
+      {/* Official Circular Emblem from public/image.png */}
+      <div className="geu-emblem-wrapper">
         <img
           src="/image.png"
           alt="Graphic Era Deemed to be University"
-          className="geu-official-logo-img"
+          className="geu-logo-img"
         />
-        <div className="geu-logo-text-block">
-          <span className="geu-logo-title">Graphic Era</span>
-          <span className="geu-logo-subtitle">Deemed to be University</span>
+      </div>
+
+      {/* University Wordmark */}
+      <div className="geu-text-wrapper">
+        <div className="geu-title">Graphic Era</div>
+        <div className="geu-subtitle">
+          Deemed to be <span>University</span>
         </div>
+        <div className="geu-location">DEHRADUN</div>
       </div>
     </div>
   );
