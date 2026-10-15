@@ -20,7 +20,9 @@ const {
   getRecoveryReport,
   triggerRecovery,
   getExecutiveAudit,
-  resetSystemData
+  resetSystemData,
+  getAdminProctoringRules,
+  updateAdminProctoringRules
 } = require('../controllers/adminController');
 
 const {
@@ -88,8 +90,12 @@ router.get('/recovery-report', protect, requireAdmin, getRecoveryReport);
 router.post('/trigger-recovery', protect, requireAdmin, triggerRecovery);
 router.get('/executive-audit', protect, requireAdmin, getExecutiveAudit);
 
-// System Purge & Clean Slate (Preserves Registered Students & Admin)
+// System Purge & Clean Slate
 router.post('/reset-system-data', protect, requireAdmin, resetSystemData);
+
+// Proctoring Governance Policies
+router.get('/proctoring-rules', protect, requireAdmin, getAdminProctoringRules);
+router.put('/proctoring-rules', protect, requireAdmin, updateAdminProctoringRules);
 
 module.exports = router;
 

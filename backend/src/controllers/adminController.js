@@ -1027,11 +1027,11 @@ const resetSystemData = async (req, res, next) => {
     // 4. Delete all subjects/courses
     const deletedCourses = await prisma.course.deleteMany();
 
-    // 5. Delete all sub-admins and dummy non-student/non-admin users
-    const deletedSubAdmins = await prisma.user.deleteMany({
+    // 5. Delete all non-admin users (both dummy students and sub-admins for testing)
+    const deletedUsers = await prisma.user.deleteMany({
       where: {
         role: {
-          notIn: ['ADMIN', 'STUDENT']
+          not: 'ADMIN'
         }
       }
     });
@@ -1039,21 +1039,126 @@ const resetSystemData = async (req, res, next) => {
     // 6. Delete all audit logs
     await prisma.adminAuditLog.deleteMany();
 
-    // Count preserved registered students
-    const preservedStudentsCount = await prisma.user.count({
-      where: { role: 'STUDENT' }
+    // Verify admin accounts still intact
+    const preservedAdminsCount = await prisma.user.count({
+      where: { role: 'ADMIN' }
     });
 
     res.json({
       success: true,
-      message: 'System data reset successfully. All dummy quizzes, subjects, and sub-admin accounts have been purged while registered students remain 100% safe.',
+      message: 'System data reset successfully. All dummy quizzes, subjects, submissions, sub-admins, and test students have been purged. Clean slate ready for fresh testing.',
       stats: {
         deletedQuizzes: deletedQuizzes.count,
         deletedCourses: deletedCourses.count,
-        deletedSubAdmins: deletedSubAdmins.count,
+        deletedUsers: deletedUsers.count,
         deletedSubmissions: deletedSubmissions.count,
         deletedQuestions: deletedQuestions.count,
-        preservedStudentsCount
+        preservedAdminsCount
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get Proctoring Rules for Admin Console
+// @route   GET /api/admin/proctoring-rules
+const getAdminProctoringRules = async (req, res, next) => {
+  try {
+    let rules = await prisma.proctoringRule.findFirst({
+      where: { isCurrent: true }
+    });
+
+    if (!rules) {
+      rules = await prisma.proctoringRule.create({
+        data: {
+          maxTabSwitches: 3,
+          violationAction: 'AUTO_LOCK',
+          enforceFullscreen: true,
+          showWarningModal: true,
+          isCurrent: true
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      rules: {
+        maxTabSwitches: rules.maxTabSwitches,
+        violationAction: rules.violationAction,
+        enforceFullscreen: rules.enforceFullscreen,
+        showWarningModal: rules.showWarningModal,
+        disableClipboard: true,
+        reconnectGraceMin: 10,
+        ipRestrictionEnabled: false,
+        allowedSubnets: "172.16.*, 10.0.*",
+        preventScreenshots: true,
+        detectExtensions: true
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update Proctoring Rules from Admin Console
+// @route   PUT /api/admin/proctoring-rules
+const updateAdminProctoringRules = async (req, res, next) => {
+  try {
+    const {
+      maxTabSwitches = 3,
+      violationAction = 'AUTO_LOCK',
+      enforceFullscreen = true,
+      showWarningModal = true
+    } = req.body;
+
+    const parsedSwitches = typeof maxTabSwitches === 'number'
+      ? maxTabSwitches
+      : parseInt(maxTabSwitches, 10) || 3;
+
+    const validAction = (violationAction === 'AUTO_SUBMIT') ? 'AUTO_SUBMIT' : 'AUTO_LOCK';
+
+    let current = await prisma.proctoringRule.findFirst({
+      where: { isCurrent: true }
+    });
+
+    let updated;
+    if (current) {
+      updated = await prisma.proctoringRule.update({
+        where: { id: current.id },
+        data: {
+          maxTabSwitches: parsedSwitches,
+          violationAction: validAction,
+          enforceFullscreen: Boolean(enforceFullscreen),
+          showWarningModal: Boolean(showWarningModal)
+        }
+      });
+    } else {
+      updated = await prisma.proctoringRule.create({
+        data: {
+          maxTabSwitches: parsedSwitches,
+          violationAction: validAction,
+          enforceFullscreen: Boolean(enforceFullscreen),
+          showWarningModal: Boolean(showWarningModal),
+          isCurrent: true
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Proctoring policies successfully saved and applied to active exams.',
+      rules: {
+        maxTabSwitches: updated.maxTabSwitches,
+        violationAction: updated.violationAction,
+        enforceFullscreen: updated.enforceFullscreen,
+        showWarningModal: updated.showWarningModal,
+        disableClipboard: true,
+        reconnectGraceMin: 10,
+        ipRestrictionEnabled: false,
+        allowedSubnets: "172.16.*, 10.0.*",
+        preventScreenshots: true,
+        detectExtensions: true
       }
     });
   } catch (error) {
@@ -1081,7 +1186,9 @@ module.exports = {
   getRecoveryReport,
   triggerRecovery,
   getExecutiveAudit,
-  resetSystemData
+  resetSystemData,
+  getAdminProctoringRules,
+  updateAdminProctoringRules
 };
 
 

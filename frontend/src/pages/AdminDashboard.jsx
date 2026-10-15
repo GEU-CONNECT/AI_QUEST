@@ -1345,6 +1345,8 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
         setSystemResetResultMsg(res.data.message);
         await Promise.allSettled([
           fetchAdminData(),
+          fetchRegisteredStudents(1),
+          fetchSubAdmins(),
           fetchAcademicConfig(),
           fetchAcademicStructureData()
         ]);
@@ -5953,9 +5955,9 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                   <Trash2 size={24} className="text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black tracking-tight">Reset System Data</h3>
+                  <h3 className="text-lg font-black tracking-tight">Full System Test Reset</h3>
                   <p className="text-xs text-rose-100 font-medium">
-                    Purge dummy quizzes, subjects & sub-admin accounts
+                    Clean slate: purge dummy students, quizzes, subjects & sub-admins
                   </p>
                 </div>
               </div>
@@ -5963,15 +5965,15 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
 
             {/* Body */}
             <div className="p-6 space-y-4 text-xs">
-              {/* Green Safety Guarantee */}
+              {/* Green Safety Guarantee for Admin */}
               <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
                 <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-black text-emerald-900 text-xs">
-                    Registered Students & Admin Stay 100% Safe
+                    Admin Account Login Stays 100% Safe
                   </div>
                   <div className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed font-medium">
-                    All registered student profiles, login credentials, and your admin account will <b>never</b> be deleted or modified.
+                    Your super-admin login credentials will <b>never</b> be deleted or modified so you remain securely logged in.
                   </div>
                 </div>
               </div>
@@ -5979,9 +5981,17 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
               {/* What will be deleted */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
                 <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                  The following items will be permanently erased:
+                  The following items will be completely erased:
                 </div>
                 <ul className="space-y-1.5 text-slate-600 font-medium pl-1">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                    <span className="font-bold text-rose-700">All Registered Students (role = 'STUDENT')</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                    <span>All Sub-Admin accounts created during testing</span>
+                  </li>
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
                     <span>All Quizzes, Questions & Options</span>
@@ -5993,10 +6003,6 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
                     <span>All dummy Courses / Subjects</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-                    <span>All Sub-Admin accounts created during testing</span>
                   </li>
                 </ul>
               </div>
