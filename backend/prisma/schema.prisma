@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String           @id @default(uuid())
+  registrationId String           @unique // e.g. "GEU-AIQ-2026-10492"
+  name           String
+  mobileNo       String           @unique
+  email          String
+  passwordHash   String
+  role           String           @default("STUDENT") // "ADMIN", "SUBADMIN", "STUDENT"
+  studentClass   String?          // "Class 9th", "Class 10th", "Class 11th", "Class 12th", "Dropper"
+  stream         String?          // "Science (PCM)", "Commerce", etc.
+  schoolName     String?
+  parentName     String?
+  parentContact  String?
+  city           String?
+  labNumber      String?          @default("LAB-01") // "LAB-01" to "LAB-20"
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  submissions    QuizSubmission[]
+
+  @@index([registrationId])
+  @@index([mobileNo])
+  @@index([role])
+  @@index([labNumber])
+}
+
+model Quiz {
+  id                     String           @id @default(uuid())
+  title                  String
+  description            String?
+  durationMinutes        Int              @default(30)
+  totalMarks             Float            @default(30.0)
+  passingMarks           Float            @default(12.0)
+  negativeMarking        Boolean          @default(false)
+  negativeMarksPerWrong  Float            @default(0.25)
+  isPublished            Boolean          @default(true)
+  isLive                 Boolean          @default(true)
+  showResultsAfterSubmit Boolean          @default(true)
+  accessCode             String?          @default("QUEST2026")
+  isPasswordProtected    Boolean          @default(false)
+  questions              Question[]
+  submissions            QuizSubmission[]
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  @@index([isPublished])
+  @@index([isLive])
+}
+
+model Question {
+  id                 String   @id @default(uuid())
+  quizId             String
+  quiz               Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  order              Int      @default(1)
+  questionText       String
+  codeSnippet        String?
+  imageUrl           String?
+  options            String   // JSON stringified array of string options
+  correctOptionIndex Int      @default(0)
+  marks              Float    @default(1.0)
+  explanation        String?
+  createdAt          DateTime @default(now())
+
+  @@index([quizId])
+}
+
+model QuizSubmission {
+  id            String    @id @default(uuid())
+  quizId        String
+  quiz          Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentRollNo String
+  studentName   String
+  answers       String    @default("{}") // JSON stringified map of questionId -> selectedIndex
+  score         Float     @default(0.0)
+  totalMarks    Float     @default(0.0)
+  percentage    Float     @default(0.0)
+  isPassed      Boolean   @default(false)
+  status        String    @default("IN_PROGRESS") // "IN_PROGRESS", "SUBMITTED", "LOCKED"
+  tabViolations Int       @default(0)
+  lockReason    String?
+  startedAt     DateTime  @default(now())
+  submittedAt   DateTime?
+
+  @@unique([quizId, studentId])
+  @@index([quizId])
+  @@index([studentId])
+  @@index([studentRollNo])
+  @@index([status])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  adminName  String
+  action     String
+  targetType String
+  targetId   String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model ProctoringRule {
+  id                String   @id @default(uuid())
+  maxTabSwitches    Int      @default(3)
+  violationAction   String   @default("AUTO_LOCK") // "AUTO_LOCK" or "AUTO_SUBMIT"
+  enforceFullscreen Boolean  @default(true)
+  showWarningModal  Boolean  @default(true)
+  isCurrent         Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/jpeg" href="/geu-tab-logo.jpg" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Quest 2026 • Graphic Era University</title>
+    <meta name="description" content="AI Quest 2026 - Northern India's Premier Technology and AI Championship by Graphic Era University." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=Outfit:wght@100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet" />
+    <script>
+      (function() {
+        function blockEvent(e) {
+          if (e.type === 'contextmenu' || e.button === 2 || e.which === 3 || (e.ctrlKey && e.button === 0)) {
+            // Allow normal right click on auth/landing page, but lockdown inside exam
+            if (window.location.pathname.includes('/take')) {
+              e.preventDefault();
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              return false;
+            }
+          }
+        }
+        ['contextmenu', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'auxclick'].forEach(function(evt) {
+          window.addEventListener(evt, blockEvent, true);
+          document.addEventListener(evt, blockEvent, true);
+        });
+      })();
+    </script>
+  </head>
+  <body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-900">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
