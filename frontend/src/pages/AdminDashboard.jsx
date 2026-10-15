@@ -41,6 +41,7 @@ import {
   Building2,
   Calendar,
   Check,
+  ChevronLeft,
   ChevronRight,
   Phone,
   Mail,
@@ -415,7 +416,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const fetchAcademicConfig = async () => {
     try {
       const res = await api.get("/academic/config");
-      if (res.data.success) {
+      if (res.data?.success) {
         if (res.data.academicTerm) {
           setAcademicTerm(res.data.academicTerm);
           setTermForm({
@@ -442,7 +443,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
         }
       }
     } catch (err) {
-      console.error("Failed to load academic config", err);
+      // Quietly ignore if academic config is not used for AI Quest event
     }
   };
 

@@ -43,9 +43,19 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/proctoring', proctoringRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Fallback compatibility route for courses
+// Fallback compatibility route for courses and academic config
 app.get('/api/courses', (req, res) => {
   res.json({ success: true, courses: [] });
+});
+
+app.get('/api/academic/config', (req, res) => {
+  res.json({
+    success: true,
+    academicTerm: { termType: 'ODD', academicYear: '2026-2027', activeSemesters: [1, 3, 5, 7] },
+    activeSemesters: [1, 3, 5, 7],
+    universities: [],
+    departments: []
+  });
 });
 
 // Error Handling Middleware
