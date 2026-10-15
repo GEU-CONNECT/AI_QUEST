@@ -1793,15 +1793,11 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
       return;
     }
 
-    if (!courseId) {
-      setError(`Please select an assigned course for Semester ${semester}. If no subjects are listed, add subjects via Control Panel.`);
-      return;
-    }
-
     if (!title.trim()) {
       setError('Please provide a title for the assessment.');
       return;
     }
+
 
     if (isPasswordProtected && !accessCode.trim()) {
       setError('Please provide an Exam Access Password, or toggle password requirement off.');
@@ -2094,7 +2090,7 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
           {/* Target Semester Selector */}
           <div className="md:col-span-3">
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Target Semester <span className="text-rose-500">*</span>
+              Target Semester <span className="text-slate-400 font-normal text-[10px]">(Optional)</span>
             </label>
             <select
               value={semester}
@@ -2119,7 +2115,7 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
           {/* Semester-Wise Assigned Course Dropdown */}
           <div className="md:col-span-4">
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Select Semester {semester} Subject <span className="text-rose-500">*</span>
+              Select Subject <span className="text-slate-400 font-normal text-[10px]">(Optional)</span>
             </label>
             <select
               value={courseId}
@@ -2127,18 +2123,15 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
               disabled={loadingCourses}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
             >
-              {semesterCourses.length === 0 ? (
-                <option value="">No subjects registered for Semester {semester}</option>
-              ) : (
-                semesterCourses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} - {c.title}
-                  </option>
-                ))
-              )}
+              <option value="">General Assessment (All Registered Students)</option>
+              {semesterCourses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} - {c.title}
+                </option>
+              ))}
             </select>
-            <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">
-              {semesterCourses.length} subjects found for Semester {semester}
+            <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">
+              {courseId ? "Subject linked" : "✓ Open to all registered students"}
             </span>
           </div>
 
@@ -2151,7 +2144,7 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Mid-Term Evaluation: Memory & Concurrency"
+              placeholder="e.g. AI Quest 2026: General Screening Assessment"
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
             />
           </div>
@@ -2166,7 +2159,7 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            placeholder="e.g. Test covers virtual memory, paging, TLB, and process synchronization. Scientific calculators permitted."
+            placeholder="e.g. Assessment open for all registered candidates. Tab switching or minimizing window will trigger security proctor lock."
             className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
           />
         </div>
@@ -2178,10 +2171,10 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
             <div>
               <span className="text-xs font-black text-[#1c1f58] uppercase tracking-wider flex items-center gap-1.5">
                 <Users size={15} />
-                Target Students
+                Target Students (All Registered Candidates)
               </span>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Choose class sections or add students directly for elective subjects.
+                All registered candidates will automatically receive access to this assessment upon login.
               </p>
             </div>
 
@@ -2195,7 +2188,7 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
                   }`}
               >
                 <Users size={13} />
-                <span>By Sections</span>
+                <span>All Registered / Sections</span>
               </button>
               <button
                 type="button"
@@ -2222,12 +2215,13 @@ const CreateQuizView = ({ onBack, onCreated, quizId = null }) => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <span className="text-xs font-black text-[#1c1f58] uppercase tracking-wider flex items-center gap-1.5">
-                    Target Semester & Sections (Semester {semester} &bull; {facultyDeptCode || 'Department'} Sections)
+                    Candidate Scope (Open Access)
                   </span>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Only students in the selected sections of {facultyDepartment || 'your department'} (Semester {semester}) will see this assessment on their student portal.
+                  <p className="text-[11px] text-emerald-700 font-bold mt-0.5 flex items-center gap-1">
+                    <span>✓</span> All registered students who log in will see and be able to attempt this assessment in full.
                   </p>
                 </div>
+
 
                 <div className="flex items-center gap-2">
                   <button

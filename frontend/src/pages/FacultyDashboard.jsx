@@ -58,9 +58,9 @@ const FacultyDashboard = ({ user, activeTab = 'quizzes', onTabChange }) => {
   const [liveSearchQuery, setLiveSearchQuery] = useState("");
   const [monitorQuizFilter, setMonitorQuizFilter] = useState("ALL");
 
-  const fetchLiveCandidates = async () => {
+  const fetchLiveCandidates = async (showLoading = false) => {
     try {
-      setLoadingLive(true);
+      if (showLoading) setLoadingLive(true);
       const res = await api.get("/quizzes/instructor/live-candidates");
       if (res.data?.success) {
         setLiveCandidates(res.data.candidates || []);
@@ -68,7 +68,7 @@ const FacultyDashboard = ({ user, activeTab = 'quizzes', onTabChange }) => {
     } catch (err) {
       console.error("Failed to load live candidates", err);
     } finally {
-      setLoadingLive(false);
+      if (showLoading) setLoadingLive(false);
     }
   };
 
@@ -81,8 +81,8 @@ const FacultyDashboard = ({ user, activeTab = 'quizzes', onTabChange }) => {
       const res = await api.post(`/quizzes/submissions/${candidateId}/lock`, { reason: "Invigilator manual intervention" });
       if (res.data?.success) {
         setUnlockMsg(`Candidate ${studentName}'s session has been FROZEN.`);
-        fetchLockedCandidates();
-        fetchLiveCandidates();
+        fetchLockedCandidates(false);
+        fetchLiveCandidates(false);
         setTimeout(() => setUnlockMsg(""), 4500);
       }
     } catch (err) {
@@ -92,24 +92,9 @@ const FacultyDashboard = ({ user, activeTab = 'quizzes', onTabChange }) => {
     }
   };
 
-  useEffect(() => {
-    fetchDashboardData();
-    fetchLockedCandidates();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "candidate-lockouts" || activeTab === "live-monitor") {
-      if (activeTab === "live-monitor") {
-        setMonitorSubTab("live");
-      }
-      fetchLockedCandidates();
-      fetchLiveCandidates();
-    }
-  }, [activeTab]);
-
-  const fetchLockedCandidates = async () => {
+  const fetchLockedCandidates = async (showLoading = false) => {
     try {
-      setLoadingLocked(true);
+      if (showLoading) setLoadingLocked(true);
       const res = await api.get('/quizzes/instructor/locked-candidates');
       if (res.data?.success) {
         setLockedCandidates(res.data.candidates || []);
@@ -117,9 +102,34 @@ const FacultyDashboard = ({ user, activeTab = 'quizzes', onTabChange }) => {
     } catch (err) {
       console.error('Failed to load locked candidates', err);
     } finally {
-      setLoadingLocked(false);
+      if (showLoading) setLoadingLocked(false);
     }
   };
+
+  useEffect(() => {
+    fetchDashboardData();
+    fetchLockedCandidates(true);
+    fetchLiveCandidates(true);
+
+    // Auto-refresh locked and live candidates every 4 seconds in background
+    const interval = setInterval(() => {
+      fetchLockedCandidates(false);
+      fetchLiveCandidates(false);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "candidate-lockouts" || activeTab === "live-monitor") {
+      if (activeTab === "live-monitor") {
+        setMonitorSubTab("live");
+      }
+      fetchLockedCandidates(false);
+      fetchLiveCandidates(false);
+    }
+  }, [activeTab]);
+
 
   const handleAuthorizeCandidate = async (candidateId, studentName, actionType = "resume") => {
     try {

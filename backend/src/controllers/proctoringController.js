@@ -104,13 +104,13 @@ const getSessionStatus = async (req, res, next) => {
 // @route   GET /api/proctoring/candidates
 const getCandidates = async (req, res, next) => {
   try {
-    const isSubAdmin = req.user.role === 'SUBADMIN';
-    const filterLab = isSubAdmin ? req.user.labNumber : req.query.labNumber;
+    const filterLab = req.query.labNumber;
     const { status, search } = req.query;
 
     const whereClause = {
       ...(filterLab ? { student: { labNumber: filterLab } } : {}),
       ...(status ? { status } : {}),
+
       ...(search ? {
         OR: [
           { studentName: { contains: search } },

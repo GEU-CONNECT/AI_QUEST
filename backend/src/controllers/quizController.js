@@ -589,6 +589,298 @@ const createQuiz = async (req, res, next) => {
   }
 };
 
+// @desc    Get all currently locked candidates for invigilator portal
+// @route   GET /api/quizzes/instructor/locked-candidates
+const getInstructorLockedCandidates = async (req, res, next) => {
+  try {
+    const lockedSubmissions = await prisma.quizSubmission.findMany({
+      where: { status: 'LOCKED' },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            registrationId: true,
+            mobileNo: true,
+            schoolName: true,
+            studentClass: true,
+            stream: true,
+            city: true
+          }
+        },
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+            totalMarks: true
+          }
+        }
+      },
+      orderBy: { startedAt: 'desc' }
+    });
+
+
+    const candidates = lockedSubmissions.map((s, idx) => ({
+      id: s.id,
+      studentName: s.studentName || s.student?.name || 'Candidate',
+      studentRollNo: s.studentRollNo || s.student?.registrationId || 'N/A',
+      quizId: s.quizId,
+      quizTitle: s.quiz?.title || 'Assessment',
+      courseCode: 'AIQ-2026',
+      section: ['A', 'B', 'C', 'D'][idx % 4],
+      semester: 1,
+      tabViolations: s.tabViolations,
+      lockReason: s.lockReason || 'Focus threshold exceeded',
+      startedAt: s.startedAt,
+      student: s.student
+    }));
+
+    res.json({
+      success: true,
+      count: candidates.length,
+      candidates
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all active test-takers for invigilator portal
+// @route   GET /api/quizzes/instructor/live-candidates
+const getInstructorLiveCandidates = async (req, res, next) => {
+  try {
+    const liveSubmissions = await prisma.quizSubmission.findMany({
+      where: { status: 'IN_PROGRESS' },
+      include: {
+        student: {
+          select: {
+            id: true,
+            name: true,
+            registrationId: true,
+            mobileNo: true,
+            schoolName: true,
+            studentClass: true,
+            stream: true,
+            city: true
+          }
+        },
+        quiz: {
+          select: {
+            id: true,
+            title: true,
+            totalMarks: true
+          }
+        }
+      },
+      orderBy: { startedAt: 'desc' }
+    });
+
+    const candidates = liveSubmissions.map((s, idx) => ({
+      id: s.id,
+      studentName: s.studentName || s.student?.name || 'Candidate',
+      studentRollNo: s.studentRollNo || s.student?.registrationId || 'N/A',
+      quizId: s.quizId,
+      quizTitle: s.quiz?.title || 'Assessment',
+      courseCode: 'AIQ-2026',
+      section: ['A', 'B', 'C', 'D'][idx % 4],
+      semester: 1,
+      tabViolations: s.tabViolations,
+      status: s.status,
+      startedAt: s.startedAt,
+      student: s.student
+    }));
+
+    res.json({
+      success: true,
+      count: candidates.length,
+      candidates
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Authorize and unlock candidate session from invigilator portal
+// @route   POST /api/quizzes/submissions/:id/unlock
+const unlockSubmissionAttempt = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { actionType } = req.body;
+
+    const submission = await prisma.quizSubmission.findUnique({
+      where: { id }
+    });
+
+    if (!submission) {
+      return res.status(404).json({ success: false, message: 'Submission record not found.' });
+    }
+
+    const updateData = {
+      status: 'IN_PROGRESS',
+      tabViolations: 0,
+      lockReason: null
+    };
+
+    if (actionType === 'retake' || actionType === 'reset_answers') {
+      updateData.answers = '{}';
+    }
+
+    const updated = await prisma.quizSubmission.update({
+      where: { id },
+      data: updateData
+    });
+
+    res.json({
+      success: true,
+      message: actionType === 'reset_answers'
+        ? 'Candidate answers have been reset. Countdown timer preserved.'
+        : 'Candidate unlocked successfully.',
+      submission: updated
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Manually freeze / lock candidate session from invigilator portal
+// @route   POST /api/quizzes/submissions/:id/lock
+const lockSubmissionAttempt = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const submission = await prisma.quizSubmission.findUnique({
+      where: { id }
+    });
+
+    if (!submission) {
+      return res.status(404).json({ success: false, message: 'Submission record not found.' });
+    }
+
+    const updated = await prisma.quizSubmission.update({
+      where: { id },
+      data: {
+        status: 'LOCKED',
+        lockReason: reason || 'Invigilator manual intervention'
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Candidate session frozen successfully.',
+      submission: updated
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update an existing quiz
+// @route   PUT /api/quizzes/:id
+const updateQuiz = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      durationMinutes,
+      totalMarks,
+      passingMarks,
+      negativeMarking,
+      negativeMarksPerWrong,
+      accessCode,
+      isPasswordProtected,
+      isLive,
+      questions
+    } = req.body;
+
+    const quiz = await prisma.quiz.findUnique({ where: { id } });
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
+    }
+
+    const updateData = {};
+    if (title) updateData.title = title.trim();
+    if (description !== undefined) updateData.description = description;
+    if (durationMinutes) updateData.durationMinutes = Number(durationMinutes);
+    if (totalMarks) updateData.totalMarks = Number(totalMarks);
+    if (passingMarks) updateData.passingMarks = Number(passingMarks);
+    if (negativeMarking !== undefined) updateData.negativeMarking = Boolean(negativeMarking);
+    if (negativeMarksPerWrong !== undefined) updateData.negativeMarksPerWrong = Number(negativeMarksPerWrong);
+    if (accessCode !== undefined) updateData.accessCode = accessCode;
+    if (isPasswordProtected !== undefined) updateData.isPasswordProtected = Boolean(isPasswordProtected);
+    if (isLive !== undefined) updateData.isLive = Boolean(isLive);
+
+    if (Array.isArray(questions) && questions.length > 0) {
+      await prisma.question.deleteMany({ where: { quizId: id } });
+      updateData.questions = {
+        create: questions.map((q, idx) => ({
+          order: idx + 1,
+          questionText: q.questionText,
+          codeSnippet: q.codeSnippet || null,
+          imageUrl: q.imageUrl || null,
+          options: JSON.stringify(q.options || ['A', 'B', 'C', 'D']),
+          correctOptionIndex: Number(q.correctOptionIndex) || 0,
+          marks: Number(q.marks) || 1.0,
+          explanation: q.explanation || null
+        }))
+      };
+    }
+
+    const updated = await prisma.quiz.update({
+      where: { id },
+      data: updateData,
+      include: { questions: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'Assessment updated successfully.',
+      quiz: updated
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Toggle quiz live status
+// @route   PATCH /api/quizzes/:id/toggle-live
+const toggleQuizLive = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const quiz = await prisma.quiz.findUnique({ where: { id } });
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: 'Quiz not found.' });
+    }
+    const updated = await prisma.quiz.update({
+      where: { id },
+      data: { isLive: !quiz.isLive }
+    });
+    res.json({
+      success: true,
+      message: `Quiz is now ${updated.isLive ? 'LIVE' : 'OFFLINE'}.`,
+      isLive: updated.isLive
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete a quiz
+// @route   DELETE /api/quizzes/:id
+const deleteQuiz = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await prisma.quiz.deleteMany({ where: { id } });
+    res.json({
+      success: true,
+      message: 'Quiz deleted successfully.'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listQuizzes,
   getQuiz,
@@ -596,5 +888,14 @@ module.exports = {
   saveProgress,
   getSessionStatus,
   submitQuiz,
-  createQuiz
+  createQuiz,
+  updateQuiz,
+  toggleQuizLive,
+  deleteQuiz,
+  getInstructorLockedCandidates,
+  getInstructorLiveCandidates,
+  unlockSubmissionAttempt,
+  lockSubmissionAttempt
 };
+
+
