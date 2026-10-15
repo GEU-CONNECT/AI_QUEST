@@ -163,7 +163,11 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
 
   // Section Validation & Completeness checks
   const isCandidateNameValid = Boolean(formData.candidateName && formData.candidateName.trim().length >= 3);
-  const isMobileValid = Boolean(formData.mobileNo && /^[6-9]\d{9}$/.test(formData.mobileNo.trim()));
+  const isMobileValid = Boolean(
+    formData.mobileNo &&
+    /^[6-9]\d{9}$/.test(formData.mobileNo.trim()) &&
+    (!formData.parentContact || formData.mobileNo.trim() !== formData.parentContact.trim())
+  );
   const isEmailValid = Boolean(formData.emailId && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.emailId.trim()));
   const isCityValid = Boolean(formData.city && formData.city.trim().length > 0);
 
@@ -172,7 +176,11 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
   const isStreamValid = Boolean(formData.stream && formData.stream.trim().length > 0);
 
   const isParentNameValid = Boolean(formData.parentName && formData.parentName.trim().length >= 2);
-  const isParentContactValid = Boolean(formData.parentContact && /^[6-9]\d{9}$/.test(formData.parentContact.trim()));
+  const isParentContactValid = Boolean(
+    formData.parentContact &&
+    /^[6-9]\d{9}$/.test(formData.parentContact.trim()) &&
+    (!formData.mobileNo || formData.parentContact.trim() !== formData.mobileNo.trim())
+  );
 
   const isSection1Complete = isCandidateNameValid && isMobileValid && isEmailValid && isCityValid;
   const isSection2Complete = isSchoolValid && isClassValid && isStreamValid;
@@ -210,13 +218,23 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
       cleanVal = digits.slice(0, 10);
     }
 
-    setFormData((prev) => ({ ...prev, [name]: cleanVal }));
-    validateField(name, cleanVal);
+    const updatedFormData = { ...formData, [name]: cleanVal };
+    setFormData(updatedFormData);
+
+    validateField(name, cleanVal, updatedFormData);
+
+    // Cross-validate candidate and parent mobile numbers immediately
+    if (name === 'mobileNo' && updatedFormData.parentContact) {
+      validateField('parentContact', updatedFormData.parentContact, updatedFormData);
+    } else if (name === 'parentContact' && updatedFormData.mobileNo) {
+      validateField('mobileNo', updatedFormData.mobileNo, updatedFormData);
+    }
+
     trigger3DPulse(0.35);
   };
 
   // Validate single field
-  const validateField = (name, value) => {
+  const validateField = (name, value, allData = formData) => {
     let error = '';
     const cleanVal = (value || '').trim();
 
@@ -225,11 +243,15 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
         if (!cleanVal) error = 'Candidate full name is required';
         else if (cleanVal.length < 3) error = 'Name must be at least 3 characters';
         break;
-      case 'mobileNo':
+      case 'mobileNo': {
+        const parentPhone = (allData.parentContact || '').trim();
         if (!cleanVal) error = 'Mobile number is required';
         else if (!/^[6-9]\d{9}$/.test(cleanVal))
           error = 'Enter a valid 10-digit Indian mobile number (starts with 6-9)';
+        else if (parentPhone && cleanVal === parentPhone)
+          error = 'Candidate phone number should be different from parents';
         break;
+      }
       case 'emailId':
         if (!cleanVal) error = 'Email ID is required';
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanVal))
@@ -249,11 +271,15 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
         if (!cleanVal) error = "Father's or Mother's name is required";
         else if (cleanVal.length < 2) error = 'Parent name must be at least 2 characters';
         break;
-      case 'parentContact':
+      case 'parentContact': {
+        const candidatePhone = (allData.mobileNo || '').trim();
         if (!cleanVal) error = "Parent's contact number is required";
         else if (!/^[6-9]\d{9}$/.test(cleanVal))
           error = 'Enter a valid 10-digit mobile number (starts with 6-9)';
+        else if (candidatePhone && cleanVal === candidatePhone)
+          error = 'Parent contact must be different from candidate phone number';
         break;
+      }
       case 'city':
         if (!cleanVal) error = 'City is required';
         break;
@@ -269,7 +295,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
     const { name, value } = e.target;
     setActiveField(null);
     setTouched((prev) => ({ ...prev, [name]: true }));
-    validateField(name, value);
+    validateField(name, value, formData);
   };
 
   const handleFocus = (fieldName) => {
@@ -294,9 +320,16 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
     ];
 
     fields.forEach((field) => {
-      const err = validateField(field, formData[field]);
+      const err = validateField(field, formData[field], formData);
       if (err) newErrors[field] = err;
     });
+
+    const cPhone = (formData.mobileNo || '').trim();
+    const pPhone = (formData.parentContact || '').trim();
+    if (cPhone && pPhone && cPhone === pPhone) {
+      newErrors.mobileNo = 'Candidate phone number should be different from parents';
+      newErrors.parentContact = 'Parent contact must be different from candidate phone number';
+    }
 
     setTouched(
       fields.reduce((acc, field) => {
@@ -305,7 +338,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
       }, {})
     );
 
-    setErrors(newErrors);
+    setErrors((prev) => ({ ...prev, ...newErrors }));
     return newErrors;
   };
 
@@ -350,17 +383,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
     });
     setErrors({});
     setTouched({});
-  };
-
-  // Copy candidate mobile to parent contact
-  const copyCandidateContact = () => {
-    sound.playPop();
-    if (formData.mobileNo) {
-      setFormData((prev) => ({ ...prev, parentContact: prev.mobileNo }));
-      validateField('parentContact', formData.mobileNo);
-      setTouched((prev) => ({ ...prev, parentContact: true }));
-      trigger3DPulse(0.8);
-    }
   };
 
   const scrollToSection = (ref) => {
@@ -592,9 +614,10 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                   <div className="error-msg">
                     <AlertCircle size={13} /> {errors.mobileNo}
                   </div>
-                ) : (
-                  <div className="field-sub-note">Used for SMS updates & login credentials</div>
-                )}
+                ) : null}
+                <div className="field-sub-note note-warning">
+                  Candidate phone number should be different from parents
+                </div>
               </div>
 
               {/* 3. Email ID */}
@@ -1090,16 +1113,9 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                   <label htmlFor="parentContact">
                     Father’s/Mother’s Contact no. <span className="req-star">*</span>
                   </label>
-                  {formData.mobileNo && (
-                    <button
-                      type="button"
-                      className="copy-number-btn"
-                      onClick={copyCandidateContact}
-                      title="Copy candidate mobile number to parent contact"
-                    >
-                      📋 Same as Candidate Mobile
-                    </button>
-                  )}
+                  <span className={`digit-counter-pill ${formData.parentContact.length === 10 ? 'is-complete' : ''}`}>
+                    {formData.parentContact.length}/10
+                  </span>
                 </div>
                 <div className="input-wrap">
                   <span className="prefix-tag">+91</span>

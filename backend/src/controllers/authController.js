@@ -53,7 +53,7 @@ const register = async (req, res, next) => {
     const cleanName = String(candidateName || '').trim();
     const cleanMobile = normalizeIndianMobile(mobileNo);
     const cleanEmail = String(emailId || '').trim().toLowerCase();
-    const cleanParentContact = normalizeIndianMobile(parentContact) || cleanMobile;
+    const cleanParentContact = normalizeIndianMobile(parentContact);
 
     if (!cleanName || cleanName.length < 2) {
       return res.status(400).json({ success: false, message: 'Candidate full name is required (min 2 characters).' });
@@ -61,6 +61,17 @@ const register = async (req, res, next) => {
 
     if (!cleanMobile || !/^[6-9]\d{9}$/.test(cleanMobile)) {
       return res.status(400).json({ success: false, message: 'Valid 10-digit Indian mobile number is required (starts with 6-9).' });
+    }
+
+    if (!cleanParentContact || !/^[6-9]\d{9}$/.test(cleanParentContact)) {
+      return res.status(400).json({ success: false, message: "Valid 10-digit parent's contact number is required (starts with 6-9)." });
+    }
+
+    if (cleanMobile === cleanParentContact) {
+      return res.status(400).json({
+        success: false,
+        message: 'Candidate phone number should be different from parents.'
+      });
     }
 
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
@@ -135,7 +146,7 @@ const register = async (req, res, next) => {
         stream: stream || 'Science (PCM)',
         schoolName: schoolName || 'General School',
         parentName: parentName || 'Guardian',
-        parentContact: cleanParentContact || cleanMobile,
+        parentContact: cleanParentContact,
         city: city || 'Dehradun',
         labNumber: assignedLab
       }
