@@ -76,10 +76,26 @@ app.use((req, res) => {
   });
 });
 
+// Ensure activeSessionId column exists in SQLite User table safely
+(async () => {
+  try {
+    const prisma = require('./config/db');
+    const tableInfo = await prisma.$queryRawUnsafe(`PRAGMA table_info("User")`);
+    const hasCol = Array.isArray(tableInfo) && tableInfo.some((col) => col.name === 'activeSessionId');
+    if (!hasCol) {
+      await prisma.$queryRawUnsafe(`ALTER TABLE "User" ADD COLUMN "activeSessionId" TEXT`);
+      console.log('🔒 [AI Quest Security] Single-device activeSessionId column initialized successfully.');
+    }
+  } catch (err) {
+    // Column already exists or non-sqlite provider
+  }
+})();
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
   console.log(`🚀 AI Quest 2026 Backend running on port ${PORT}`);
   console.log(`📡 Health Check: http://localhost:${PORT}/health`);
+  console.log(`🔒 Single-Device Session Security Active`);
   console.log(`===============================================`);
 });
 

@@ -19,6 +19,13 @@ api.interceptors.response.use(
   (res) => res,
   (error) => {
     if (error.response?.status === 401 && !window.location.pathname.includes('/login') && window.location.pathname !== '/') {
+      const isConcurrent = error.response?.data?.code === 'SESSION_TERMINATED';
+      if (isConcurrent) {
+        sessionStorage.setItem(
+          'concurrent_logout_msg',
+          error.response?.data?.message || 'You have been logged out because your account was logged in from another device.'
+        );
+      }
       localStorage.removeItem('quizx_token');
       localStorage.removeItem('quizx_user');
       window.location.href = '/login';

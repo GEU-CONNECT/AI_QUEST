@@ -1,10 +1,11 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ai_quest_event_2026_jwt_secret_secure_key';
 
-const generateToken = (user) => {
+const generateToken = (user, sessionId) => {
   return jwt.sign(
     {
       userId: user.id,
@@ -12,7 +13,8 @@ const generateToken = (user) => {
       name: user.name,
       mobileNo: user.mobileNo,
       role: user.role,
-      labNumber: user.labNumber
+      labNumber: user.labNumber,
+      sessionId: sessionId
     },
     JWT_SECRET,
     { expiresIn: '7d' }
@@ -134,6 +136,9 @@ const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(rawSecret, salt);
 
+    // Generate initial device session ID
+    const sessionId = `sess_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+
     const user = await prisma.user.create({
       data: {
         registrationId: regId,
@@ -148,11 +153,12 @@ const register = async (req, res, next) => {
         parentName: parentName || 'Guardian',
         parentContact: cleanParentContact,
         city: city || 'Dehradun',
-        labNumber: assignedLab
+        labNumber: assignedLab,
+        activeSessionId: sessionId
       }
     });
 
-    const token = generateToken(user);
+    const token = generateToken(user, sessionId);
 
     res.status(201).json({
       success: true,
@@ -281,7 +287,17 @@ const login = async (req, res, next) => {
       }
     }
 
-    const token = generateToken(user);
+    // Single-Device Security: Generate a fresh session ID
+    // Updating activeSessionId in the database immediately invalidates any other logged-in device
+    const sessionId = `sess_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { activeSessionId: sessionId }
+    });
+    user.activeSessionId = sessionId;
+
+    const token = generateToken(user, sessionId);
 
     res.json({
       success: true,
@@ -358,8 +374,21 @@ const getMe = async (req, res, next) => {
   }
 };
 
+// @desc    Fast session check to verify if current device session is still active
+// @route   GET /api/auth/session-check
+const checkSessionStatus = async (req, res) => {
+  // protect middleware has verified activeSessionId matches decoded.sessionId
+  res.json({
+    success: true,
+    active: true,
+    userId: req.user.id,
+    role: req.user.role
+  });
+};
+
 module.exports = {
   register,
   login,
-  getMe
+  getMe,
+  checkSessionStatus
 };

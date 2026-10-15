@@ -32,7 +32,30 @@ const protect = async (req, res, next) => {
       });
     }
 
+    // Single-Device Security Enforcement:
+    // If user has an activeSessionId in database, verify that this token matches it.
+    // If the token has a different sessionId, it means this user has logged in from another device!
+    if (user.activeSessionId && decoded.sessionId && user.activeSessionId !== decoded.sessionId) {
+      return res.status(401).json({
+        success: false,
+        code: 'SESSION_TERMINATED',
+        sessionExpired: true,
+        message: 'You have been logged out because your account was logged in from another device.'
+      });
+    }
+
+    // If activeSessionId exists in database but incoming token has no sessionId (legacy token), invalidate it
+    if (user.activeSessionId && !decoded.sessionId) {
+      return res.status(401).json({
+        success: false,
+        code: 'SESSION_TERMINATED',
+        sessionExpired: true,
+        message: 'Your session has expired. Please log in again to verify this device.'
+      });
+    }
+
     req.user = user;
+    req.sessionId = decoded.sessionId;
     next();
   } catch (error) {
     return res.status(401).json({

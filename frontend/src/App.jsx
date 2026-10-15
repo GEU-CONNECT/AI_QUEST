@@ -29,6 +29,32 @@ export default function App() {
     }
   }, [user, activeTab]);
 
+  // Single-Device Real-Time Session Heartbeat: Detects concurrent login on another device
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      try {
+        await api.get("/auth/session-check");
+      } catch (err) {
+        // Handled by api/client.js response interceptor
+      }
+    }, 4000);
+
+    const handleFocus = async () => {
+      try {
+        await api.get("/auth/session-check");
+      } catch (_) {}
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [user]);
+
   const checkAuth = async () => {
     const token = localStorage.getItem("quizx_token");
     const storedUser = localStorage.getItem("quizx_user");

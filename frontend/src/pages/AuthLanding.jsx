@@ -5,14 +5,30 @@ import QuesterForm from '../components/QuesterForm';
 import LoginForm from '../components/LoginForm';
 import SuccessModal from '../components/SuccessModal';
 import { AIQuestLogo, GraphicEraLogo } from '../components/BrandingAssets';
-import { LogIn, UserPlus, AlertCircle } from 'lucide-react';
+import { LogIn, UserPlus, AlertCircle, ShieldAlert, X } from 'lucide-react';
 import { sound } from '../utils/audio';
 import api from '../api/client';
 import '../App.css';
 
 export default function AuthLanding({ onLoginSuccess }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('register'); // 'register' | 'login'
+  const [concurrentLogoutMsg, setConcurrentLogoutMsg] = useState(() => {
+    const msg = sessionStorage.getItem('concurrent_logout_msg');
+    if (msg) {
+      sessionStorage.removeItem('concurrent_logout_msg');
+      return msg;
+    }
+    return '';
+  });
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem('concurrent_logout_msg') ? 'login' : 'register';
+  });
+
+  React.useEffect(() => {
+    if (concurrentLogoutMsg) {
+      setActiveTab('login');
+    }
+  }, [concurrentLogoutMsg]);
 
   const [formData, setFormData] = useState({
     candidateName: '',
@@ -124,6 +140,31 @@ export default function AuthLanding({ onLoginSuccess }) {
                   Go to Login
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Concurrent Login Alert Banner if logged out from another device */}
+          {concurrentLogoutMsg && (
+            <div className="max-w-xl mx-auto mb-6 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-sm flex items-start justify-between gap-3 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-3">
+              <div className="flex items-start gap-3">
+                <ShieldAlert size={20} className="shrink-0 text-amber-400 mt-0.5" />
+                <div>
+                  <div className="font-black text-amber-300 uppercase tracking-wider text-xs">
+                    Single-Device Security Policy Enforced
+                  </div>
+                  <div className="text-xs text-amber-200/90 mt-1 leading-relaxed">
+                    {concurrentLogoutMsg}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConcurrentLogoutMsg('')}
+                className="text-amber-400 hover:text-white transition-colors cursor-pointer p-1"
+                title="Dismiss"
+              >
+                <X size={15} />
+              </button>
             </div>
           )}
 
