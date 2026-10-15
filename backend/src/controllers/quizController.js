@@ -284,7 +284,7 @@ const saveProgress = async (req, res, next) => {
     }
 
     if (sub.status === 'SUBMITTED' || sub.status === 'EVALUATED') {
-      return res.status(400).json({ success: false, message: 'Assessment already submitted.' });
+      return res.json({ success: true, message: 'Assessment already submitted.', isSubmitted: true });
     }
 
     if (sub.status === 'LOCKED') {
@@ -309,6 +309,48 @@ const saveProgress = async (req, res, next) => {
   }
 };
 
+// @desc    Get session status for live proctoring heartbeat
+// @route   GET /api/quizzes/:id/session-status
+const getSessionStatus = async (req, res, next) => {
+  try {
+    const { id: quizId } = req.params;
+    const sub = await prisma.quizSubmission.findUnique({
+      where: {
+        quizId_studentId: {
+          quizId,
+          studentId: req.user.id
+        }
+      }
+    });
+
+    if (!sub) {
+      return res.json({
+        success: true,
+        exists: false,
+        status: 'NOT_STARTED',
+        isLocked: false,
+        tabViolations: 0,
+        serverTime: Date.now()
+      });
+    }
+
+    const isLocked = sub.status === 'LOCKED';
+    res.json({
+      success: true,
+      exists: true,
+      serverTime: Date.now(),
+      status: sub.status,
+      isLocked,
+      tabViolations: sub.tabViolations || 0,
+      resetToken: sub.lockReason?.startsWith('RESET_BY_INSTRUCTOR:') ? sub.lockReason : null,
+      lockReason: sub.lockReason || null,
+      isSubmitted: sub.status === 'SUBMITTED' || sub.status === 'EVALUATED'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Final submit and instant evaluation of assessment
 // @route   POST /api/quizzes/:id/submit
 const submitQuiz = async (req, res, next) => {
@@ -318,7 +360,11 @@ const submitQuiz = async (req, res, next) => {
 
     const quiz = await prisma.quiz.findUnique({
       where: { id: quizId },
-      include: { questions: true }
+      include: {
+        questions: {
+          orderBy: { order: 'asc' }
+        }
+      }
     });
 
     if (!quiz) {
@@ -334,22 +380,6 @@ const submitQuiz = async (req, res, next) => {
       }
     });
 
-    if (existingSub && (existingSub.status === 'SUBMITTED' || existingSub.status === 'EVALUATED')) {
-      return res.status(400).json({
-        success: false,
-        alreadySubmitted: true,
-        message: 'This assessment has already been submitted.'
-      });
-    }
-
-    if (existingSub && existingSub.status === 'LOCKED') {
-      return res.status(403).json({
-        success: false,
-        isLocked: true,
-        message: 'Your examination attempt is locked. Please contact your invigilator.'
-      });
-    }
-
     // Evaluate answers
     const studentAnswers = answers && typeof answers === 'object' ? answers : (
       existingSub && existingSub.answers ? JSON.parse(existingSub.answers) : {}
@@ -361,7 +391,7 @@ const submitQuiz = async (req, res, next) => {
     let incorrectCount = 0;
     let unattemptedCount = 0;
 
-    quiz.questions.forEach((q) => {
+    const detailedAnalysis = quiz.questions.map((q) => {
       totalMarks += q.marks;
       const ans = studentAnswers[q.id];
 
@@ -381,11 +411,58 @@ const submitQuiz = async (req, res, next) => {
       } else {
         unattemptedCount++;
       }
+
+      let parsedOpts = [];
+      try {
+        parsedOpts = JSON.parse(q.options);
+      } catch (e) {
+        parsedOpts = [q.options];
+      }
+
+      return {
+        questionId: q.id,
+        order: q.order,
+        questionText: q.questionText,
+        options: parsedOpts,
+        selectedOptionIndex: isAttempted ? Number(ans) : null,
+        correctOptionIndex: q.correctOptionIndex,
+        isCorrect,
+        marks: q.marks,
+        explanation: q.explanation
+      };
     });
+
+    // If assessment already submitted, gracefully return existing evaluated results
+    if (existingSub && (existingSub.status === 'SUBMITTED' || existingSub.status === 'EVALUATED')) {
+      const existingResult = {
+        id: existingSub.id,
+        submissionId: existingSub.id,
+        score: existingSub.score,
+        totalMarks: existingSub.totalMarks,
+        percentage: existingSub.percentage,
+        isPassed: existingSub.isPassed,
+        passingMarks: quiz.passingMarks,
+        status: existingSub.status,
+        submittedAt: existingSub.submittedAt,
+        showResultsAfterSubmit: Boolean(quiz.showResultsAfterSubmit),
+        alreadySubmitted: true,
+        detailedAnalysis
+      };
+      return res.json({
+        success: true,
+        alreadySubmitted: true,
+        message: 'This assessment has already been submitted.',
+        result: existingResult,
+        submission: existingResult
+      });
+    }
 
     const finalScore = Math.max(0, Math.round(calculatedScore * 100) / 100);
     const percentage = totalMarks > 0 ? Math.round((finalScore / totalMarks) * 100 * 10) / 10 : 0;
     const isPassed = finalScore >= quiz.passingMarks;
+
+    const studentRollNo = req.user.registrationId || req.user.mobileNo || req.user.email || 'STUDENT';
+    const studentName = req.user.name || 'Candidate';
 
     const submission = await prisma.quizSubmission.upsert({
       where: {
@@ -406,8 +483,8 @@ const submitQuiz = async (req, res, next) => {
       create: {
         quizId,
         studentId: req.user.id,
-        studentRollNo: req.user.registrationId || req.user.mobileNo,
-        studentName: req.user.name,
+        studentRollNo,
+        studentName,
         answers: JSON.stringify(studentAnswers),
         score: finalScore,
         totalMarks,
@@ -419,21 +496,28 @@ const submitQuiz = async (req, res, next) => {
       }
     });
 
+    const resultPayload = {
+      id: submission.id,
+      submissionId: submission.id,
+      score: submission.score,
+      totalMarks: submission.totalMarks,
+      percentage: submission.percentage,
+      isPassed: submission.isPassed,
+      passingMarks: quiz.passingMarks,
+      status: submission.status,
+      submittedAt: submission.submittedAt,
+      correctCount,
+      incorrectCount,
+      unattemptedCount,
+      showResultsAfterSubmit: Boolean(quiz.showResultsAfterSubmit),
+      detailedAnalysis
+    };
+
     res.json({
       success: true,
       message: 'Assessment submitted successfully! Evaluation complete.',
-      submission: {
-        id: submission.id,
-        score: submission.score,
-        totalMarks: submission.totalMarks,
-        percentage: submission.percentage,
-        isPassed: submission.isPassed,
-        status: submission.status,
-        submittedAt: submission.submittedAt,
-        correctCount,
-        incorrectCount,
-        unattemptedCount
-      }
+      result: resultPayload,
+      submission: resultPayload
     });
   } catch (error) {
     next(error);
@@ -505,6 +589,7 @@ module.exports = {
   getQuiz,
   verifyAccessCode,
   saveProgress,
+  getSessionStatus,
   submitQuiz,
   createQuiz
 };

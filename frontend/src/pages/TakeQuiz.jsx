@@ -1230,14 +1230,18 @@ const TakeQuiz = ({ user }) => {
       const finalAnswers = answersRef.current || answers;
       const res = await api.post(`/quizzes/${quizId}/submit`, { answers: finalAnswers });
       if (res.data.success) {
-        setSubmissionResult(res.data.result);
+        setSubmissionResult(res.data.result || res.data.submission);
       }
     } catch (err) {
       console.error("Submission failed", err);
-      if (err.response?.data?.isClosed) {
+      autoSubmittingRef.current = false;
+      const data = err.response?.data;
+      if (data?.result || data?.submission) {
+        setSubmissionResult(data.result || data.submission);
+      } else if (data?.isClosed) {
         setIsClosedError(true);
       } else {
-        alert(err.response?.data?.message || 'Failed to submit quiz');
+        alert(data?.message || 'Failed to submit quiz');
       }
     } finally {
       setIsSubmitting(false);
