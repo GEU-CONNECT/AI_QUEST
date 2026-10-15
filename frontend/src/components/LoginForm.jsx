@@ -42,24 +42,7 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
     window.dispatchEvent(new CustomEvent('ai-quest-activity', { detail: { intensity } }));
   };
 
-  // Quick fill helper for testing
-  const handleQuickFill = (type) => {
-    sound.playPop();
-    setError('');
-    if (type === 'admin') {
-      setLoginType('admin');
-      setIdentifier('9999999999');
-      setPassword('admin123');
-    } else if (type === 'subadmin') {
-      setLoginType('admin');
-      setIdentifier('9800000001');
-      setPassword('lab123');
-    } else if (type === 'student') {
-      setLoginType('student');
-      setPhone('9812345678');
-      setPassword('');
-    }
-  };
+
 
   // Intelligent handler for candidate phone / registration ID / email input
   const handleCandidateInputChange = (rawVal) => {
@@ -241,9 +224,8 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
                   />
                   <Phone size={18} className="field-icon-right" />
                 </div>
-                <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-                  <span>Sign in instantly with your 10-digit mobile or Registration ID</span>
-                  <span className="text-amber-400/90 font-medium">No Password Needed</span>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  <span>Sign in with your 10-digit registered mobile or Registration ID</span>
                 </div>
               </div>
 
@@ -297,36 +279,7 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
             </div>
           )}
 
-          {/* Quick Fill Test Shortcuts */}
-          <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-400">
-            <span className="font-semibold text-slate-400">Quick Test:</span>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('student')}
-                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 transition-colors"
-                title="Pragya Karnwal (LAB-01)"
-              >
-                Sample Student
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('subadmin')}
-                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 transition-colors"
-                title="Invigilator LAB-01"
-              >
-                Lab 01 Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin')}
-                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-rose-300 transition-colors"
-                title="Super Admin"
-              >
-                Super Admin
-              </button>
-            </div>
-          </div>
+
 
           <div className="login-action-block layer-3d-front mt-5">
             <button

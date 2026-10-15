@@ -48,7 +48,7 @@ export default function AuthLanding({ onLoginSuccess }) {
   const [regId, setRegId] = useState('');
   const [showModal, setShowModal] = useState(false);
 
-  // Real backend submission for registration
+  // Real backend submission for registration (NO auto-login — user must login manually)
   const handleFormSubmit = async () => {
     setIsSubmitting(true);
     setServerError('');
@@ -57,14 +57,11 @@ export default function AuthLanding({ onLoginSuccess }) {
       const res = await api.post('/auth/register', formData);
 
       if (res.data?.success) {
-        localStorage.setItem('quizx_token', res.data.token);
-        localStorage.setItem('quizx_user', JSON.stringify(res.data.user));
+        // Do NOT store token or call onLoginSuccess — registration only
         setRegId(res.data.regId);
         setIsSubmitting(false);
         setShowModal(true);
-        if (onLoginSuccess) {
-          onLoginSuccess(res.data.user, false);
-        }
+        // After modal is dismissed, user will be switched to login tab
       }
     } catch (err) {
       setIsSubmitting(false);
@@ -252,7 +249,12 @@ export default function AuthLanding({ onLoginSuccess }) {
       {/* Success Admit Pass Modal */}
       <SuccessModal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => {
+          setShowModal(false);
+          // Switch to login tab after registration — user must login manually
+          setActiveTab('login');
+          window.scrollTo({ top: 120, behavior: 'smooth' });
+        }}
         data={formData}
         regId={regId}
       />

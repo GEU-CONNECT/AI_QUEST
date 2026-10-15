@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+require('dotenv').config();
 
 const prisma = new PrismaClient();
 
@@ -269,26 +270,38 @@ const QUESTIONS_DATA = [
 async function main() {
   console.log('--- Seeding AI Quest 2026 Event Database ---');
 
-  // 1. Seed Super Admin
-  const adminPasswordHash = await bcrypt.hash('admin123', 10);
+  // 1. Seed Super Admin — credentials from environment variables (NOT hardcoded)
+  const superAdminName = process.env.SUPER_ADMIN_NAME || 'AI Quest Chief Administrator';
+  const superAdminMobile = process.env.SUPER_ADMIN_MOBILE || '9999999999';
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@geu.ac.in';
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
+
+  if (!superAdminPassword) {
+    console.error('❌ SUPER_ADMIN_PASSWORD environment variable is required for seeding!');
+    console.error('   Set it in your .env file: SUPER_ADMIN_PASSWORD=your_secure_password');
+    process.exit(1);
+  }
+
+  const adminPasswordHash = await bcrypt.hash(superAdminPassword, 12);
   const admin = await prisma.user.upsert({
-    where: { mobileNo: '9999999999' },
+    where: { mobileNo: superAdminMobile },
     update: {
-      name: 'AI Quest Chief Administrator',
+      name: superAdminName,
       role: 'ADMIN',
+      email: superAdminEmail,
       passwordHash: adminPasswordHash
     },
     create: {
       registrationId: 'ADMIN-001',
-      name: 'AI Quest Chief Administrator',
-      mobileNo: '9999999999',
-      email: 'admin@geu.ac.in',
+      name: superAdminName,
+      mobileNo: superAdminMobile,
+      email: superAdminEmail,
       passwordHash: adminPasswordHash,
       role: 'ADMIN',
       labNumber: 'MAIN-CONTROL'
     }
   });
-  console.log(`✓ Super Admin seeded: ${admin.name} (Mobile: 9999999999, Pass: admin123)`);
+  console.log(`✓ Super Admin seeded: ${admin.name} (Mobile: ${superAdminMobile})`);
 
   // 2. Seed 20 Sub-Admins for LAB-01 through LAB-20
   const subAdminPassHash = await bcrypt.hash('lab123', 10);
