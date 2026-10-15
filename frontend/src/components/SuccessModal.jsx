@@ -120,10 +120,6 @@ export default function SuccessModal({ isOpen, onClose, data, regId }) {
                     <span className="m-label">Registration ID</span>
                     <span className="m-val highlight-id">{regId || data.registrationId || 'GEU-AIQ-2026-ACTIVE'}</span>
                   </div>
-                  <div className="meta-item">
-                    <span className="m-label">Assigned Lab</span>
-                    <span className="m-val font-bold text-amber-300">{data.labNumber || 'LAB-01'}</span>
-                  </div>
                 </div>
 
                 {/* Guardian & Contact Footer Row */}

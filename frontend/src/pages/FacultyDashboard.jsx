@@ -241,60 +241,50 @@ const FacultyDashboard = ({ user, activeTab = 'quizzes', onTabChange }) => {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#1c1f58] tracking-tight">
             {user?.role === 'SUBADMIN'
-              ? `AI Quest Lab Invigilator Portal - ${user?.labNumber || "LAB-01"}`
+              ? "AI Quest Invigilator Portal"
               : "Manage Course Assessments"}
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
             {user?.role === 'SUBADMIN'
-              ? "Authorized to monitor live examination candidates and unlock or reset student attempts in your assigned lab."
+              ? "Authorized to monitor live examination candidates and unlock or reset student attempts."
               : "Configure section targets, assign exam access passwords, and monitor live candidate tests."}
           </p>
         </div>
       </div>
 
       {/* 2. Key Metrics Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {user?.role === 'SUBADMIN' ? (
-          <>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Assigned Lab</span>
-                <Building2 size={18} className="text-[#1c1f58]" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900">{user?.labNumber || "LAB-01"}</div>
-              <div className="text-[11px] text-slate-500 font-medium">Physical exam station</div>
+      {user?.role === 'SUBADMIN' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Locked Candidates</span>
+              <Lock size={18} className="text-rose-600" />
             </div>
+            <div className="text-2xl sm:text-3xl font-black text-rose-600">{lockedCandidates.length}</div>
+            <div className="text-[11px] text-slate-500 font-medium">Requires invigilator unlock</div>
+          </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Locked Candidates</span>
-                <Lock size={18} className="text-rose-600" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-black text-rose-600">{lockedCandidates.length}</div>
-              <div className="text-[11px] text-slate-500 font-medium">Requires invigilator unlock</div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Active Test-Takers</span>
+              <Activity size={18} className="text-emerald-600" />
             </div>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-600">{liveCandidates.length}</div>
+            <div className="text-[11px] text-slate-500 font-medium">Currently taking quiz</div>
+          </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Active Test-Takers</span>
-                <Activity size={18} className="text-emerald-600" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-black text-emerald-600">{liveCandidates.length}</div>
-              <div className="text-[11px] text-slate-500 font-medium">Currently taking quiz</div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Authorized Rights</span>
+              <ShieldCheck size={18} className="text-indigo-600" />
             </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Authorized Rights</span>
-                <ShieldCheck size={18} className="text-indigo-600" />
-              </div>
-              <div className="text-sm font-black text-slate-900 mt-2">Unlock & Reset Only</div>
-              <div className="text-[11px] text-slate-500 font-medium">Super Admin creates quizzes</div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+            <div className="text-sm font-black text-slate-900 mt-2">Unlock & Reset Only</div>
+            <div className="text-[11px] text-slate-500 font-medium">Super Admin creates quizzes</div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
               <div className="flex items-center justify-between text-slate-400">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Assigned Courses</span>
                 <BookOpen size={18} className="text-blue-600" />
@@ -329,9 +319,8 @@ const FacultyDashboard = ({ user, activeTab = 'quizzes', onTabChange }) => {
               <div className="text-2xl sm:text-3xl font-black text-slate-900">{totalSubmissions}</div>
               <div className="text-[11px] text-slate-500 font-medium">Evaluated student tests</div>
             </div>
-          </>
+          </div>
         )}
-      </div>
 
       {/* 3. Section Content based on activeTab */}
       {(user?.role === 'SUBADMIN' || activeTab === "candidate-lockouts" || activeTab === "live-monitor") ? (

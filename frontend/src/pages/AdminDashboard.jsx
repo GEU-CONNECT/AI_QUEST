@@ -84,6 +84,8 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [facultyFilter, setFacultyFilter] = useState("ALL");
   const [courseFilter, setCourseFilter] = useState("ALL");
   const [submissionSearch, setSubmissionSearch] = useState("");
+  const [submissionPage, setSubmissionPage] = useState(1);
+  const [submissionLimit, setSubmissionLimit] = useState(25);
 
   // Sub-Admin Management State
   const [subAdmins, setSubAdmins] = useState([]);
@@ -91,9 +93,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [subAdminSearch, setSubAdminSearch] = useState("");
   const [subAdminForm, setSubAdminForm] = useState({
     name: "",
-    mobileNo: "",
-    password: "",
-    labNumber: "LAB-01"
+    password: ""
   });
   const [isCreatingSubAdmin, setIsCreatingSubAdmin] = useState(false);
   const [subAdminSuccessMsg, setSubAdminSuccessMsg] = useState("");
@@ -520,12 +520,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     setSubAdminSuccessMsg("");
 
     if (!subAdminForm.name.trim()) {
-      setSubAdminErrorMsg("Please enter sub-admin invigilator name.");
-      return;
-    }
-    const cleanMobile = subAdminForm.mobileNo.replace(/[^0-9]/g, "");
-    if (cleanMobile.length !== 10) {
-      setSubAdminErrorMsg("Please enter a valid 10-digit mobile number.");
+      setSubAdminErrorMsg("Please enter sub-admin invigilator name / username.");
       return;
     }
     if (!subAdminForm.password || subAdminForm.password.length < 4) {
@@ -537,21 +532,17 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
       setIsCreatingSubAdmin(true);
       const res = await api.post("/admin/subadmins", {
         name: subAdminForm.name.trim(),
-        mobileNo: cleanMobile,
-        password: subAdminForm.password,
-        labNumber: subAdminForm.labNumber || "LAB-01"
+        password: subAdminForm.password
       });
 
       if (res.data?.success) {
-        setSubAdminSuccessMsg(`Sub-Admin ${res.data.subAdmin?.name} created successfully for ${res.data.subAdmin?.labNumber}!`);
+        setSubAdminSuccessMsg(`Sub-Admin "${res.data.subAdmin?.name}" created successfully! Login ID: ${res.data.subAdmin?.registrationId || res.data.subAdmin?.name}`);
         setSubAdminForm({
           name: "",
-          mobileNo: "",
-          password: "",
-          labNumber: "LAB-01"
+          password: ""
         });
         fetchSubAdmins();
-        setTimeout(() => setSubAdminSuccessMsg(""), 5000);
+        setTimeout(() => setSubAdminSuccessMsg(""), 6000);
       }
     } catch (err) {
       setSubAdminErrorMsg(err.response?.data?.message || "Failed to create Sub-Admin account.");
@@ -560,8 +551,8 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     }
   };
 
-  const handleDeleteSubAdmin = async (id, name, lab) => {
-    if (!window.confirm(`Are you sure you want to remove Sub-Admin "${name}" (${lab})?\n\nThey will no longer be able to log in or unlock student sessions.`)) {
+  const handleDeleteSubAdmin = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to remove Sub-Admin "${name}"?\n\nThey will no longer be able to log in or unlock student sessions.`)) {
       return;
     }
     try {
@@ -1251,6 +1242,13 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     );
   });
 
+  // Paginated Submissions
+  const submissionTotalPages = Math.max(1, Math.ceil(filteredSubmissions.length / submissionLimit));
+  const paginatedSubmissions = filteredSubmissions.slice(
+    (submissionPage - 1) * submissionLimit,
+    submissionPage * submissionLimit
+  );
+
   // Filtered Courses (Semester-Wise & Search)
   const filteredCourses = courses.filter((c) => {
     const matchesSemester =
@@ -1407,8 +1405,8 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
 
   return (
     <div className="space-y-6 font-sans">
-      {/* 1. Header Overview & Stats (Only shown for quizzes & management, hidden on Registered Candidates) */}
-      {activeTab !== "students" && (
+      {/* 1. Header Overview & Stats (Only shown for quizzes management tab, hidden on Create Quiz, Results, Submissions, Students, etc.) */}
+      {activeTab === "quizzes" && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
@@ -3470,7 +3468,10 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                 <input
                   type="text"
                   value={submissionSearch}
-                  onChange={(e) => setSubmissionSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSubmissionSearch(e.target.value);
+                    setSubmissionPage(1);
+                  }}
                   placeholder="Search roll, name, or quiz..."
                   className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58] bg-white w-48 sm:w-56"
                 />
@@ -3522,7 +3523,7 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                       </td>
                     </tr>
                   ) : (
-                    filteredSubmissions.map((s) => (
+                    paginatedSubmissions.map((s) => (
                       <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="py-3 px-4">
                           <div className="font-bold text-slate-900">{s.studentName}</div>
@@ -3537,14 +3538,14 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                           {s.score} / {s.totalMarks} ({s.percentage}%)
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          <span className={`inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg text-xs font-black font-mono ${
                             (s.tabViolations || 0) === 0
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              ? "bg-slate-100 text-slate-700"
                               : (s.tabViolations || 0) <= 2
-                              ? "bg-amber-50 text-amber-700 border border-amber-200"
-                              : "bg-rose-50 text-rose-700 border border-rose-200"
+                              ? "bg-amber-100 text-amber-800 border border-amber-200"
+                              : "bg-rose-100 text-rose-800 border border-rose-200"
                           }`}>
-                            {s.tabViolations || 0} Switches
+                            {s.tabViolations || 0}
                           </span>
                         </td>
                         <td className="py-3 px-4">
@@ -3595,6 +3596,68 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                 </tbody>
               </table>
             </div>
+
+            {/* Submissions Pagination Footer */}
+            {filteredSubmissions.length > 0 && (
+              <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-xs text-slate-500 font-medium">
+                  Showing{" "}
+                  <span className="font-bold text-slate-800">
+                    {(submissionPage - 1) * submissionLimit + 1}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-bold text-slate-800">
+                    {Math.min(submissionPage * submissionLimit, filteredSubmissions.length)}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-bold text-slate-800">{filteredSubmissions.length}</span> submissions
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <span>Rows per page:</span>
+                    <select
+                      value={submissionLimit}
+                      onChange={(e) => {
+                        setSubmissionLimit(Number(e.target.value));
+                        setSubmissionPage(1);
+                      }}
+                      className="px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#1c1f58]"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionPage((p) => Math.max(1, p - 1))}
+                      disabled={submissionPage <= 1}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+
+                    <span className="px-2.5 py-1 text-xs font-bold text-slate-700 font-mono">
+                      Page {submissionPage} of {submissionTotalPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionPage((p) => Math.min(submissionTotalPages, p + 1))}
+                      disabled={submissionPage >= submissionTotalPages}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Next Page"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3619,10 +3682,10 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
             <div>
               <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <Building2 size={18} className="text-[#1c1f58]" />
-                <span>Lab Sub-Admins Management</span>
+                <span>Sub-Admins Management</span>
               </h2>
               <p className="text-xs text-slate-500">
-                Manage lab invigilator credentials for AI Quest 2026. Sub-admins are strictly granted rights to monitor sessions and unlock/reset student attempts in their assigned lab.
+                Manage invigilator credentials for AI Quest 2026. Sub-admins are strictly granted rights to monitor live candidate sessions and unlock or reset attempts.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -3637,10 +3700,10 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 sm:p-6">
             <h3 className="text-sm font-black text-slate-900 mb-1 flex items-center gap-2">
               <UserPlus size={16} className="text-[#1c1f58]" />
-              <span>Create New Lab Sub-Admin Account</span>
+              <span>Create New Sub-Admin Account</span>
             </h3>
             <p className="text-xs text-slate-500 mb-4">
-              Enter invigilator details and assign a physical examination lab.
+              Enter invigilator name / username and secure password to generate a sub-admin access account.
             </p>
 
             {subAdminSuccessMsg && (
@@ -3656,32 +3719,17 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
               </div>
             )}
 
-            <form onSubmit={handleCreateSubAdmin} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <form onSubmit={handleCreateSubAdmin} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                  Full Name / Invigilator Name
+                  Invigilator Name / Username
                 </label>
                 <input
                   type="text"
                   required
                   value={subAdminForm.name}
                   onChange={(e) => setSubAdminForm({ ...subAdminForm, name: e.target.value })}
-                  placeholder="e.g. Invigilator LAB-21"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                  Mobile Number (Login ID)
-                </label>
-                <input
-                  type="tel"
-                  required
-                  maxLength={10}
-                  value={subAdminForm.mobileNo}
-                  onChange={(e) => setSubAdminForm({ ...subAdminForm, mobileNo: e.target.value })}
-                  placeholder="10-digit mobile number"
+                  placeholder="e.g. Invigilator-01"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
                 />
               </div>
@@ -3701,34 +3749,18 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                  Assigned Lab
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    value={subAdminForm.labNumber}
-                    onChange={(e) => setSubAdminForm({ ...subAdminForm, labNumber: e.target.value })}
-                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58] bg-white"
-                  >
-                    {Array.from({ length: 30 }, (_, i) => {
-                      const lab = `LAB-${String(i + 1).padStart(2, "0")}`;
-                      return <option key={lab} value={lab}>{lab}</option>;
-                    })}
-                  </select>
-
-                  <button
-                    type="submit"
-                    disabled={isCreatingSubAdmin}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50 shrink-0"
-                  >
-                    {isCreatingSubAdmin ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Plus size={14} />
-                    )}
-                    <span>Create</span>
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  disabled={isCreatingSubAdmin}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  {isCreatingSubAdmin ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Plus size={14} />
+                  )}
+                  <span>Create Sub-Admin</span>
+                </button>
               </div>
             </form>
           </div>
@@ -3746,7 +3778,7 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                   type="text"
                   value={subAdminSearch}
                   onChange={(e) => setSubAdminSearch(e.target.value)}
-                  placeholder="Search sub-admin, mobile, or lab..."
+                  placeholder="Search sub-admin by name or ID..."
                   className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1c1f58] bg-white w-56 sm:w-64"
                 />
               </div>
@@ -3756,10 +3788,9 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                    <th className="py-3 px-4">Lab</th>
+                    <th className="py-3 px-4 text-center">#</th>
                     <th className="py-3 px-4">Invigilator Name</th>
-                    <th className="py-3 px-4">Login Mobile</th>
-                    <th className="py-3 px-4">Registration ID</th>
+                    <th className="py-3 px-4">Login ID / Registration ID</th>
                     <th className="py-3 px-4">Authorized Permissions</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -3770,23 +3801,16 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                       const q = subAdminSearch.toLowerCase();
                       return (
                         s.name?.toLowerCase().includes(q) ||
-                        s.mobileNo?.includes(q) ||
-                        s.labNumber?.toLowerCase().includes(q) ||
                         s.registrationId?.toLowerCase().includes(q)
                       );
                     })
-                    .map((s) => (
+                    .map((s, idx) => (
                       <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3 px-4">
-                          <span className="font-mono font-bold text-xs bg-indigo-50 text-[#1c1f58] border border-indigo-200 px-2.5 py-1 rounded-lg">
-                            {s.labNumber || "LAB-01"}
-                          </span>
-                        </td>
+                        <td className="py-3 px-4 text-center font-bold text-slate-400">{idx + 1}</td>
                         <td className="py-3 px-4 font-bold text-slate-900">{s.name}</td>
-                        <td className="py-3 px-4 font-mono font-semibold text-slate-700">{s.mobileNo}</td>
-                        <td className="py-3 px-4 font-mono text-[11px] text-slate-400">{s.registrationId}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-[#1c1f58]">{s.registrationId || s.name}</td>
                         <td className="py-3 px-4">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
                             <Lock size={10} />
                             <span>Unlock & Reset Attempts Only</span>
                           </span>
@@ -3794,7 +3818,7 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                         <td className="py-3 px-4 text-right">
                           <button
                             type="button"
-                            onClick={() => handleDeleteSubAdmin(s.id, s.name, s.labNumber)}
+                            onClick={() => handleDeleteSubAdmin(s.id, s.name)}
                             disabled={deletingSubAdminId === s.id}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Delete Sub-Admin Account"
@@ -3926,7 +3950,6 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                     <th className="py-3 px-4 text-center">Rank</th>
                     <th className="py-3 px-4">Candidate Details</th>
                     <th className="py-3 px-4">School & City</th>
-                    <th className="py-3 px-4">Assessment</th>
                     <th className="py-3 px-4 text-center">Score / Total</th>
                     <th className="py-3 px-4 text-center">Percentage</th>
                     <th className="py-3 px-4 text-center">Tab Switches</th>
@@ -3937,7 +3960,7 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                   {loadingResults ? (
                     <tr>
-                      <td colSpan="9" className="py-12 text-center text-slate-400">
+                      <td colSpan="8" className="py-12 text-center text-slate-400">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <Loader2 size={24} className="animate-spin text-[#1c1f58]" />
                           <span className="font-semibold text-xs">Computing candidate rankings & marks...</span>
@@ -3946,7 +3969,7 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                     </tr>
                   ) : resultsData.length === 0 ? (
                     <tr>
-                      <td colSpan="9" className="py-12 text-center text-slate-400 font-semibold">
+                      <td colSpan="8" className="py-12 text-center text-slate-400 font-semibold">
                         No evaluated results recorded yet.
                       </td>
                     </tr>
@@ -3998,11 +4021,6 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                           <div className="text-[10px] text-slate-500">{r.city} • {r.studentClass}</div>
                         </td>
 
-                        {/* Assessment */}
-                        <td className="py-3 px-4">
-                          <div className="font-semibold text-slate-800">{r.quizTitle}</div>
-                        </td>
-
                         {/* Score */}
                         <td className="py-3 px-4 text-center font-black text-sm text-[#1c1f58]">
                           {r.score} <span className="text-slate-400 text-xs font-normal">/ {r.totalMarks}</span>
@@ -4013,24 +4031,19 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                           {r.percentage}%
                         </td>
 
-                        {/* Tab Switch Count Badge */}
+                        {/* Tab Switch Count */}
                         <td className="py-3 px-4 text-center">
-                          {r.tabViolations === 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 size={11} />
-                              <span>0 Switches (Clean)</span>
-                            </span>
-                          ) : r.tabViolations <= 2 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              <AlertTriangle size={11} />
-                              <span>{r.tabViolations} Switches</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
-                              <ShieldAlert size={11} />
-                              <span>{r.tabViolations} Switches (Flagged)</span>
-                            </span>
-                          )}
+                          <span
+                            className={`inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg text-xs font-black font-mono ${
+                              (r.tabViolations || 0) === 0
+                                ? "bg-slate-100 text-slate-700"
+                                : (r.tabViolations || 0) <= 2
+                                ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                : "bg-rose-100 text-rose-800 border border-rose-200"
+                            }`}
+                          >
+                            {r.tabViolations || 0}
+                          </span>
                         </td>
 
                         {/* Result Pass/Fail */}

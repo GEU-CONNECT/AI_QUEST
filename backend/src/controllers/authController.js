@@ -235,7 +235,13 @@ const login = async (req, res, next) => {
       orConditions.push({ email: { contains: normalizedInput } });
     }
 
-    // 4. Role aliases
+    // 4. Name or Username matches
+    orConditions.push({ name: rawSearch });
+    if (rawSearch.length >= 3) {
+      orConditions.push({ name: { contains: rawSearch } });
+    }
+
+    // 5. Role aliases
     if (normalizedInput === 'admin') {
       orConditions.push({ role: 'ADMIN' });
     }

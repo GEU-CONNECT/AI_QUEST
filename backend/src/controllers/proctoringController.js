@@ -191,14 +191,6 @@ const unlockCandidate = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Submission not found.' });
     }
 
-    // Lab isolation check for Sub-admins
-    if (req.user.role === 'SUBADMIN' && sub.student.labNumber !== req.user.labNumber) {
-      return res.status(403).json({
-        success: false,
-        message: `Unauthorized: You can only unlock students assigned to ${req.user.labNumber}.`
-      });
-    }
-
     const updated = await prisma.quizSubmission.update({
       where: { id },
       data: {
@@ -216,7 +208,7 @@ const unlockCandidate = async (req, res, next) => {
         action: 'UNLOCK_STUDENT',
         targetType: 'SUBMISSION',
         targetId: id,
-        details: `Unlocked student ${sub.student.name} (${sub.student.registrationId}) in ${sub.student.labNumber}.`
+        details: `Unlocked student ${sub.student.name} (${sub.student.registrationId}).`
       }
     });
 
@@ -243,13 +235,6 @@ const resetCandidate = async (req, res, next) => {
 
     if (!sub) {
       return res.status(404).json({ success: false, message: 'Submission not found.' });
-    }
-
-    if (req.user.role === 'SUBADMIN' && sub.student.labNumber !== req.user.labNumber) {
-      return res.status(403).json({
-        success: false,
-        message: `Unauthorized: You can only reset students in ${req.user.labNumber}.`
-      });
     }
 
     const resetToken = `RESET_BY_INSTRUCTOR:${Date.now()}`;

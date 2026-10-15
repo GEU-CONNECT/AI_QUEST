@@ -210,7 +210,7 @@ export default function SubAdminDashboard() {
             <div className="h-6 w-px bg-slate-700/60 hidden sm:block"></div>
             <div className="hidden sm:block">
               <span className="text-xs font-black text-amber-400 font-mono tracking-wider">
-                {storedUser.labNumber || 'LAB-01'} INVIGILATION PORTAL
+                AI QUEST INVIGILATION PORTAL
               </span>
             </div>
           </div>
@@ -218,7 +218,7 @@ export default function SubAdminDashboard() {
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
               <div className="text-xs font-bold text-slate-200">{storedUser.name}</div>
-              <div className="text-[11px] font-mono text-cyan-400">Sub-Admin • {storedUser.labNumber}</div>
+              <div className="text-[11px] font-mono text-cyan-400">Invigilator Sub-Admin</div>
             </div>
 
             <button
@@ -235,18 +235,9 @@ export default function SubAdminDashboard() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Lab KPI Strip */}
+        {/* KPI Strip */}
         {!isProjectorMode && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-4 rounded-2xl bg-[#0f172a] border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold text-slate-400 uppercase">Assigned Lab</div>
-                <div className="text-2xl font-black text-amber-400 font-mono">{storedUser.labNumber || 'LAB-01'}</div>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-amber-400/10 flex items-center justify-center text-amber-400">
-                <Monitor size={20} />
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
             <div className="p-4 rounded-2xl bg-[#0f172a] border border-slate-800 flex items-center justify-between">
               <div>
@@ -293,7 +284,7 @@ export default function SubAdminDashboard() {
                 }`}
               >
                 <Users size={14} />
-                <span>Live Lab Candidates ({candidates.length})</span>
+                <span>Live Candidates ({candidates.length})</span>
               </button>
 
               <button
@@ -305,7 +296,7 @@ export default function SubAdminDashboard() {
                 }`}
               >
                 <Trophy size={14} />
-                <span>Lab Leaderboard Screen</span>
+                <span>Leaderboard Screen</span>
               </button>
 
               <button
@@ -493,7 +484,7 @@ export default function SubAdminDashboard() {
                   <GraphicEraLogo className="scale-75 origin-left" />
                   <div className="h-6 w-px bg-slate-700"></div>
                   <span className="text-sm font-black text-amber-400 tracking-wider">
-                    {storedUser.labNumber || 'LAB-01'} LIVE SCOREBOARD
+                    AI QUEST LIVE SCOREBOARD
                   </span>
                 </div>
                 <button
@@ -510,10 +501,10 @@ export default function SubAdminDashboard() {
                 <div>
                   <h3 className="text-xl font-black text-white flex items-center gap-2">
                     <Trophy size={22} className="text-amber-400" />
-                    <span>{storedUser.labNumber || 'LAB-01'} Top Quester Ranklist</span>
+                    <span>AI Quest Top Quester Ranklist</span>
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Live candidate standings in this lab (Auto-refreshes every 5s).
+                    Live candidate standings (Auto-refreshes every 5s).
                   </p>
                 </div>
                 <div className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/30">

@@ -497,47 +497,59 @@ const getExecutiveAudit = async (req, res, next) => {
   }
 };
 
-// @desc    Create new Lab Sub-Admin account
+// @desc    Create new Sub-Admin account (No mobile/lab requirement)
 // @route   POST /api/admin/subadmins
 const createSubAdmin = async (req, res, next) => {
   try {
-    const { name, mobileNo, email, password, labNumber } = req.body;
+    const { name, password, mobileNo, email } = req.body;
 
     if (!name || !name.trim()) {
-      return res.status(400).json({ success: false, message: 'Sub-admin name is required.' });
-    }
-    const cleanMobile = mobileNo ? mobileNo.toString().replace(/[^0-9]/g, '').slice(-10) : '';
-    if (!cleanMobile || cleanMobile.length !== 10) {
-      return res.status(400).json({ success: false, message: 'Valid 10-digit mobile number is required.' });
+      return res.status(400).json({ success: false, message: 'Sub-admin name / username is required.' });
     }
     if (!password || password.length < 4) {
       return res.status(400).json({ success: false, message: 'Password must be at least 4 characters.' });
     }
 
-    const existingUser = await prisma.user.findFirst({
-      where: { mobileNo: cleanMobile }
-    });
+    const cleanName = name.trim();
 
-    if (existingUser) {
+    // Check if subadmin with same name already exists
+    const existingName = await prisma.user.findFirst({
+      where: { name: cleanName, role: 'SUBADMIN' }
+    });
+    if (existingName) {
       return res.status(409).json({
         success: false,
-        message: `Account with mobile number ${cleanMobile} already exists (${existingUser.role}).`
+        message: `A Sub-Admin with username "${cleanName}" already exists.`
       });
     }
 
+    // Generate unique mobile number if not provided (to satisfy DB unique constraint)
+    let cleanMobile = mobileNo ? mobileNo.toString().replace(/[^0-9]/g, '').slice(-10) : '';
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      cleanMobile = '98' + Math.floor(10000000 + Math.random() * 90000000);
+    }
+
+    // Ensure mobile is unique
+    let attempts = 0;
+    while (attempts < 5) {
+      const exists = await prisma.user.findUnique({ where: { mobileNo: cleanMobile } });
+      if (!exists) break;
+      cleanMobile = '98' + Math.floor(10000000 + Math.random() * 90000000);
+      attempts++;
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
-    const assignedLab = (labNumber && labNumber.trim()) ? labNumber.trim().toUpperCase() : 'LAB-01';
-    const regId = `SUB-${assignedLab.replace(/[^A-Z0-9]/g, '')}-${cleanMobile.slice(-4)}`;
+    const regId = `SUB-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newSubAdmin = await prisma.user.create({
       data: {
         registrationId: regId,
-        name: name.trim(),
+        name: cleanName,
         mobileNo: cleanMobile,
-        email: email && email.trim() ? email.trim().toLowerCase() : `${assignedLab.toLowerCase().replace(/[^a-z0-9]/g, '')}@geu.ac.in`,
+        email: email && email.trim() ? email.trim().toLowerCase() : `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'subadmin'}${Math.floor(100 + Math.random() * 900)}@geu.ac.in`,
         passwordHash,
         role: 'SUBADMIN',
-        labNumber: assignedLab
+        labNumber: 'GENERAL'
       },
       select: {
         id: true,
@@ -545,14 +557,13 @@ const createSubAdmin = async (req, res, next) => {
         name: true,
         mobileNo: true,
         email: true,
-        labNumber: true,
         createdAt: true
       }
     });
 
     res.status(201).json({
       success: true,
-      message: `Sub-Admin ${newSubAdmin.name} created successfully for ${assignedLab}.`,
+      message: `Sub-Admin "${newSubAdmin.name}" created successfully. Login ID: ${newSubAdmin.registrationId}`,
       subAdmin: newSubAdmin
     });
   } catch (error) {
@@ -932,12 +943,11 @@ const exportResultsExcel = async (req, res, next) => {
       { header: 'City', key: 'city', width: 18 },
       { header: 'Class', key: 'class', width: 14 },
       { header: 'Stream', key: 'stream', width: 22 },
-      { header: 'Assessment Title', key: 'quizTitle', width: 30 },
       { header: 'Score Obtained', key: 'score', width: 16 },
       { header: 'Total Marks', key: 'totalMarks', width: 14 },
       { header: 'Percentage', key: 'percentage', width: 14 },
       { header: 'Result', key: 'result', width: 14 },
-      { header: 'Tab Switch Violations', key: 'tabViolations', width: 22 },
+      { header: 'Tab Switches', key: 'tabViolations', width: 16 },
       { header: 'Submission Time', key: 'submittedAt', width: 24 }
     ];
 
@@ -974,12 +984,11 @@ const exportResultsExcel = async (req, res, next) => {
         city: s.student?.city || 'Dehradun',
         class: s.student?.studentClass || 'Class 12th',
         stream: s.student?.stream || '',
-        quizTitle: s.quiz?.title || 'AI Quest 2026',
         score: s.score,
         totalMarks: s.totalMarks || s.quiz?.totalMarks || 30,
         percentage: `${s.percentage}%`,
         result: s.isPassed ? 'PASSED' : 'FAILED',
-        tabViolations: `${s.tabViolations || 0} Switches`,
+        tabViolations: s.tabViolations || 0,
         submittedAt: s.submittedAt ? new Date(s.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'
       });
 

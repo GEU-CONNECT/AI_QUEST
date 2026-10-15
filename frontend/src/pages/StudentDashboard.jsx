@@ -204,13 +204,6 @@ const StudentDashboard = ({ user, activeTab = "active" }) => {
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-right shadow-2xs">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Lab</div>
-            <div className="text-xs font-black text-amber-600">
-              {candidateLab}
-            </div>
-          </div>
-
-          <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-right shadow-2xs">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Registration ID</div>
             <div className="text-xs font-black text-[#1c1f58]">{studentRollNo}</div>
           </div>
