@@ -181,8 +181,33 @@ async function main() {
     quizXEnv: runCmd("cat /home/ubuntu/QUIZ_X/*/.env /home/ubuntu/QUIZ_X/.env 2>/dev/null || true").split('\n').filter(Boolean),
     aiQuestEnv: runCmd("cat /home/ubuntu/AI_QUEST/backend/.env /home/ubuntu/.env_backups/aiquest_backend_env_backup 2>/dev/null || true").split('\n').filter(Boolean),
     pm2Processes: runCmd("pm2 list 2>/dev/null || true").split('\n').filter(Boolean),
-    allDbFiles: runCmd("find /home/ubuntu \\( -name '*.db*' -o -name '*.sqlite*' -o -name '*.sql*' \\) 2>/dev/null || true").split('\n').filter(Boolean)
+    allDbFiles: runCmd("find /home/ubuntu \\( -name '*.db*' -o -name '*.sqlite*' -o -name '*.sql*' \\) 2>/dev/null || true").split('\n').filter(Boolean),
+    nginxRecentRegisters: runCmd("grep -E 'POST /api/auth/register' /var/log/nginx/access.log* 2>/dev/null | tail -n 25 || true").split('\n').filter(Boolean)
   };
+
+  // Check QUIZ_X database for candidate roster
+  try {
+    const quizXBackendDir = '/home/ubuntu/QUIZ_X/backend';
+    if (fs.existsSync(path.join(quizXBackendDir, 'node_modules/@prisma/client'))) {
+      const nodeCode = "const { PrismaClient } = require('/home/ubuntu/QUIZ_X/backend/node_modules/@prisma/client'); require('dotenv').config({ path: '/home/ubuntu/QUIZ_X/backend/.env' }); const p = new PrismaClient(); p.user.findMany().then(u => { console.log(JSON.stringify({ success: true, count: u.length, users: u })); }).catch(e => { console.log(JSON.stringify({ success: false, error: e.message })); }).finally(() => p.$disconnect());";
+      const quizXOut = runCmd(`node -e "${nodeCode}"`);
+      if (quizXOut) {
+        try {
+          report.quizXQueryResult = JSON.parse(quizXOut);
+          if (report.quizXQueryResult && report.quizXQueryResult.success && report.quizXQueryResult.users) {
+            console.log(`🎉 Found ${report.quizXQueryResult.users.length} users in QUIZ_X database!`);
+            for (const u of report.quizXQueryResult.users) {
+              registerCandidate({ ...u, source: 'QUIZ_X Postgres Database' });
+            }
+          }
+        } catch (e) {
+          report.quizXQueryResult = { raw: quizXOut };
+        }
+      }
+    }
+  } catch (qxErr) {
+    report.quizXQueryError = qxErr.message;
+  }
 
   // 2. Discover ALL candidate database files across filesystem
   const searchDirs = [
