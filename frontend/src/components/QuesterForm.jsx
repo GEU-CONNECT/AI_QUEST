@@ -234,7 +234,11 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
 
     // Numeric sanitize for phone fields
     if (name === 'mobileNo' || name === 'parentContact') {
-      cleanVal = value.replace(/\D/g, '').slice(0, 10);
+      let digits = value.replace(/\D/g, '');
+      if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+      else if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+      else if (digits.length > 10) digits = digits.slice(-10);
+      cleanVal = digits.slice(0, 10);
     }
 
     setFormData((prev) => ({ ...prev, [name]: cleanVal }));
@@ -618,7 +622,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     type="tel"
                     name="mobileNo"
                     placeholder="10-digit mobile number"
-                    maxLength={10}
+                    maxLength={16}
                     value={formData.mobileNo}
                     onChange={handleChange}
                     onFocus={() => handleFocus('mobileNo')}
@@ -1156,7 +1160,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     type="tel"
                     name="parentContact"
                     placeholder="10-digit guardian mobile"
-                    maxLength={10}
+                    maxLength={16}
                     value={formData.parentContact}
                     onChange={handleChange}
                     onFocus={() => handleFocus('parentContact')}

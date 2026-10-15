@@ -19,6 +19,19 @@ const generateToken = (user) => {
   );
 };
 
+const normalizeIndianMobile = (phone) => {
+  if (!phone) return '';
+  let digits = String(phone).replace(/\D/g, '').trim();
+  if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  } else if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.slice(2);
+  } else if (digits.length > 10) {
+    digits = digits.slice(-10);
+  }
+  return digits;
+};
+
 // @desc    Register a new student candidate
 // @route   POST /api/auth/register
 const register = async (req, res, next) => {
@@ -38,38 +51,46 @@ const register = async (req, res, next) => {
     } = req.body;
 
     const cleanName = String(candidateName || '').trim();
-    const cleanMobile = String(mobileNo || '').replace(/\D/g, '').trim();
+    const cleanMobile = normalizeIndianMobile(mobileNo);
     const cleanEmail = String(emailId || '').trim().toLowerCase();
-    const cleanParentContact = String(parentContact || '').replace(/\D/g, '').trim();
+    const cleanParentContact = normalizeIndianMobile(parentContact) || cleanMobile;
 
     if (!cleanName || cleanName.length < 2) {
       return res.status(400).json({ success: false, message: 'Candidate full name is required (min 2 characters).' });
     }
 
-    if (!/^[6-9]\d{9}$/.test(cleanMobile)) {
-      return res.status(400).json({ success: false, message: 'Valid 10-digit Indian mobile number is required.' });
+    if (!cleanMobile || !/^[6-9]\d{9}$/.test(cleanMobile)) {
+      return res.status(400).json({ success: false, message: 'Valid 10-digit Indian mobile number is required (starts with 6-9).' });
     }
 
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       return res.status(400).json({ success: false, message: 'Valid email address is required.' });
     }
 
-    // Check if phone already registered
+    // Check if phone or email already registered
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
           { mobileNo: cleanMobile },
+          { mobileNo: '91' + cleanMobile },
+          { mobileNo: '0' + cleanMobile },
+          { mobileNo: { endsWith: cleanMobile } },
           { email: cleanEmail }
         ]
       }
     });
 
     if (existingUser) {
-      if (existingUser.mobileNo === cleanMobile) {
+      const isMobileDuplicate =
+        existingUser.mobileNo === cleanMobile ||
+        existingUser.mobileNo === '91' + cleanMobile ||
+        existingUser.mobileNo.endsWith(cleanMobile);
+
+      if (isMobileDuplicate) {
         return res.status(409).json({
           success: false,
           isDuplicate: true,
-          message: `Mobile number ${cleanMobile} is already registered. Please login with this number.`
+          message: `Mobile number ${cleanMobile} is already registered. Please login directly with this number.`
         });
       }
       return res.status(409).json({
@@ -153,18 +174,19 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
   try {
     const { identifier, phone, password } = req.body;
-    const searchId = String(identifier || phone || '').trim();
+    const rawSearch = String(identifier || phone || '').trim();
 
-    if (!searchId) {
+    if (!rawSearch) {
       return res.status(400).json({
         success: false,
-        message: 'Mobile number, registration ID, or username is required.'
+        message: 'Mobile number, registration ID, or email is required.'
       });
     }
 
     // Lookup user by mobile, registration ID, email, or username alias
-    const normalizedInput = searchId.toLowerCase().trim();
-    const cleanDigits = searchId.replace(/\D/g, '');
+    const normalizedInput = rawSearch.toLowerCase();
+    const cleanDigits = rawSearch.replace(/\D/g, '');
+    const normMobile = normalizeIndianMobile(rawSearch);
 
     let labAlias = null;
     if (normalizedInput.startsWith('lab')) {
@@ -174,17 +196,45 @@ const login = async (req, res, next) => {
       }
     }
 
+    const orConditions = [];
+
+    // 1. Mobile number matches (canonical 10-digit, with 91, with 0, endsWith, or exact cleanDigits)
+    if (normMobile) {
+      orConditions.push({ mobileNo: normMobile });
+      orConditions.push({ mobileNo: '91' + normMobile });
+      orConditions.push({ mobileNo: '0' + normMobile });
+      orConditions.push({ mobileNo: { endsWith: normMobile } });
+    }
+    if (cleanDigits && cleanDigits !== normMobile) {
+      orConditions.push({ mobileNo: cleanDigits });
+    }
+    orConditions.push({ mobileNo: rawSearch });
+
+    // 2. Registration ID matches (exact uppercase, trimmed, or ID suffix contains)
+    orConditions.push({ registrationId: rawSearch.toUpperCase() });
+    orConditions.push({ registrationId: rawSearch });
+    if (rawSearch.length >= 4) {
+      orConditions.push({ registrationId: { contains: rawSearch.toUpperCase() } });
+    }
+
+    // 3. Email matches
+    orConditions.push({ email: normalizedInput });
+    orConditions.push({ email: { startsWith: normalizedInput + '@' } });
+    if (normalizedInput.includes('@')) {
+      orConditions.push({ email: { contains: normalizedInput } });
+    }
+
+    // 4. Role aliases
+    if (normalizedInput === 'admin') {
+      orConditions.push({ role: 'ADMIN' });
+    }
+    if (labAlias) {
+      orConditions.push({ labNumber: labAlias, role: 'SUBADMIN' });
+    }
+
     const user = await prisma.user.findFirst({
       where: {
-        OR: [
-          ...(cleanDigits ? [{ mobileNo: cleanDigits }] : []),
-          { mobileNo: searchId },
-          { registrationId: searchId.toUpperCase() },
-          { email: normalizedInput },
-          { email: { startsWith: normalizedInput + '@' } },
-          ...(normalizedInput === 'admin' ? [{ role: 'ADMIN' }] : []),
-          ...(labAlias ? [{ labNumber: labAlias, role: 'SUBADMIN' }] : [])
-        ]
+        OR: orConditions
       }
     });
 

@@ -61,21 +61,54 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
     }
   };
 
+  // Intelligent handler for candidate phone / registration ID / email input
+  const handleCandidateInputChange = (rawVal) => {
+    setError('');
+    // Check if user is typing or pasting a phone number (digits, optional +91, spaces, dashes)
+    const isPhoneLike = /^[\d\s+\-()]+$/.test(rawVal);
+    if (isPhoneLike) {
+      let digits = rawVal.replace(/\D/g, '');
+      if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+      else if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+      else if (digits.length > 10) digits = digits.slice(-10);
+      setPhone(digits.slice(0, 10));
+    } else {
+      // Registration ID or Email (e.g. GEU-AIQ-2026-10001, test@domain.com)
+      setPhone(rawVal.trim());
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     sound.playPop();
     setError('');
 
+    let loginPayload = {};
+
     if (loginType === 'student') {
-      const cleanPhone = phone.trim();
-      if (!cleanPhone) {
-        setError('Please enter your 10-digit registered mobile number');
+      const cleanInput = phone.trim();
+      if (!cleanInput) {
+        setError('Please enter your 10-digit registered mobile number or Registration ID');
         return;
       }
-      if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-        setError('Enter a valid 10-digit Indian phone number starting with 6-9');
-        return;
+
+      // Check if it's purely digits (phone number)
+      const isDigitsOnly = /^\d+$/.test(cleanInput);
+      if (isDigitsOnly) {
+        if (cleanInput.length !== 10) {
+          setError('Please enter your complete 10-digit mobile number');
+          return;
+        }
+        if (!/^[6-9]\d{9}$/.test(cleanInput)) {
+          setError('Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9');
+          return;
+        }
       }
+
+      loginPayload = {
+        phone: cleanInput,
+        identifier: cleanInput
+      };
     } else {
       if (!identifier.trim()) {
         setError('Please enter your username, email, or mobile');
@@ -85,17 +118,17 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
         setError('Please enter your password');
         return;
       }
+      loginPayload = {
+        identifier: identifier.trim(),
+        password: password.trim()
+      };
     }
 
     try {
       setIsLoading(true);
       trigger3DPulse(2.5);
 
-      const payload = loginType === 'student'
-        ? { phone: phone.trim() }
-        : { identifier: identifier.trim(), password: password.trim() };
-
-      const res = await api.post('/auth/login', payload);
+      const res = await api.post('/auth/login', loginPayload);
 
       if (res.data?.success) {
         localStorage.setItem('quizx_token', res.data.token);
@@ -178,21 +211,29 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
           {loginType === 'student' ? (
             <>
               <div className={`form-field-group full-width ${isFocused ? 'is-focused' : ''} ${error ? 'has-error' : ''}`}>
-                <label htmlFor="loginPhone">
-                  Registered Mobile Number <span className="req-star">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="loginPhone" className="text-xs font-bold text-slate-200">
+                    Registered Mobile / Registration ID <span className="req-star">*</span>
+                  </label>
+                  {phone && /^\d{10}$/.test(phone) && (
+                    <span className="text-[11px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                      10/10 Digits
+                    </span>
+                  )}
+                </div>
                 <div className="input-wrap login-big-input-wrap">
-                  <span className="prefix-tag">+91</span>
+                  {(!phone || /^\d+$/.test(phone)) && (
+                    <span className="prefix-tag">+91</span>
+                  )}
                   <input
                     id="loginPhone"
-                    type="tel"
+                    type="text"
                     name="phone"
-                    placeholder="Enter 10-digit mobile number"
-                    maxLength={10}
+                    placeholder="e.g. 9812345678 or GEU-AIQ-2026-XXXXX"
+                    maxLength={32}
                     value={phone}
                     onChange={(e) => {
-                      setPhone(e.target.value.replace(/\D/g, ''));
-                      setError('');
+                      handleCandidateInputChange(e.target.value);
                       trigger3DPulse(0.5);
                     }}
                     onFocus={() => {
@@ -202,9 +243,13 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
                     }}
                     onBlur={() => setIsFocused(false)}
                     autoFocus
-                    autoComplete="tel"
+                    autoComplete="off"
                   />
                   <Phone size={18} className="field-icon-right" />
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+                  <span>Sign in instantly with your 10-digit mobile or Registration ID</span>
+                  <span className="text-amber-400/90 font-medium">No Password Needed</span>
                 </div>
               </div>
 

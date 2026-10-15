@@ -619,10 +619,16 @@ export default function SubAdminDashboard() {
                   <input
                     type="tel"
                     required
-                    maxLength={10}
+                    maxLength={16}
                     placeholder="e.g. 9812345678"
                     value={walkinForm.mobileNo}
-                    onChange={(e) => setWalkinForm({ ...walkinForm, mobileNo: e.target.value.replace(/\D/g, '') })}
+                    onChange={(e) => {
+                      let digits = e.target.value.replace(/\D/g, '');
+                      if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+                      else if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+                      else if (digits.length > 10) digits = digits.slice(-10);
+                      setWalkinForm({ ...walkinForm, mobileNo: digits.slice(0, 10) });
+                    }}
                     className="w-full py-2.5 px-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs outline-none focus:border-amber-400"
                   />
                 </div>
