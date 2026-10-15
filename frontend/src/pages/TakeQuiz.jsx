@@ -836,8 +836,8 @@ const TakeQuiz = ({ user }) => {
       if (!hasFocus) {
         if (!lostFocusStart) {
           lostFocusStart = Date.now();
-        } else if (Date.now() - lostFocusStart > 1200) {
-          // Sustained focus loss for > 1200ms
+        } else if (Date.now() - lostFocusStart > 2000) {
+          // Sustained focus loss for > 2000ms
           applyImmediateBlackout(true);
           setIsFocusLost(true);
           if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
@@ -924,18 +924,6 @@ const TakeQuiz = ({ user }) => {
           }
         } catch (_) {}
       }, 1500);
-    };
-
-    const handleWindowBlur = () => {
-      if (!hasExamStartedRef.current) return;
-      if (Date.now() < fullscreenGraceRef.current) return;
-
-      applyImmediateBlackout(true);
-      setIsFocusLost(true);
-      if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
-        hasLeftWindowRef.current = true;
-        recordFocusViolation("Window focus lost / switched application");
-      }
     };
 
     // Mobile / iOS Safari App Switch Guard
@@ -1046,7 +1034,6 @@ const TakeQuiz = ({ user }) => {
 
     addNative(document, "visibilitychange", handleVisibilityChange, { capture: true, passive: true });
     addNative(window, "visibilitychange", handleVisibilityChange, { capture: true, passive: true });
-    addNative(window, "blur", handleWindowBlur, { capture: true, passive: true });
     addNative(window, "focus", handleWindowFocus, { capture: true, passive: true });
     addNative(window, "pagehide", handlePageHide, { capture: true, passive: true });
     addNative(window, "pageshow", handlePageShow, { capture: true, passive: true });
@@ -1061,7 +1048,6 @@ const TakeQuiz = ({ user }) => {
       }
       removeNative(document, "visibilitychange", handleVisibilityChange, { capture: true });
       removeNative(window, "visibilitychange", handleVisibilityChange, { capture: true });
-      removeNative(window, "blur", handleWindowBlur, { capture: true });
       removeNative(window, "focus", handleWindowFocus, { capture: true });
       removeNative(window, "pagehide", handlePageHide, { capture: true });
       removeNative(window, "pageshow", handlePageShow, { capture: true });
