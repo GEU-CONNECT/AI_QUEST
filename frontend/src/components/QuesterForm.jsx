@@ -80,49 +80,7 @@ const STREAM_OPTIONS = [
   'General Secondary (Class 9-10)',
 ];
 
-export const POPULAR_CITIES = [
-  'Dehradun',
-  'Haridwar',
-  'Roorkee',
-  'Rishikesh',
-  'Saharanpur',
-  'Delhi NCR',
-  'Paonta Sahib',
-  'Rudrapur',
-  'Chandigarh',
-  'Haldwani',
-];
 
-export const ALL_CITY_OPTIONS = [
-  'Dehradun',
-  'Haridwar',
-  'Roorkee',
-  'Rishikesh',
-  'Saharanpur',
-  'Delhi NCR',
-  'Paonta Sahib',
-  'Rudrapur',
-  'Chandigarh',
-  'Haldwani',
-  'Nainital',
-  'Kashipur',
-  'Kotdwar',
-  'Meerut',
-  'Moradabad',
-  'Muzaffarnagar',
-  'Noida',
-  'Gurugram',
-  'Ghaziabad',
-  'Faridabad',
-  'Agra',
-  'Aligarh',
-  'Bareilly',
-  'Lucknow',
-  'Kanpur',
-  'Ambala',
-  'Yamunanagar',
-  'Shimla',
-];
 
 export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitting }) {
   const [errors, setErrors] = useState({});
@@ -698,40 +656,16 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     id="city"
                     type="text"
                     name="city"
-                    list="city-options-datalist"
-                    placeholder="Enter city (e.g. Dehradun, Haridwar, Roorkee, Delhi NCR)"
+                    placeholder="Enter city (e.g. Dehradun, Haridwar, Roorkee)"
                     value={formData.city}
                     onChange={handleChange}
                     onFocus={() => handleFocus('city')}
                     onBlur={handleBlur}
-                    autoComplete="off"
+                    autoComplete="address-level2"
                   />
-                  <datalist id="city-options-datalist">
-                    {ALL_CITY_OPTIONS.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-
-                  {formData.city ? (
-                    <button
-                      type="button"
-                      className="city-clear-pill-btn"
-                      title="Clear city"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                      }}
-                      onClick={() => {
-                        sound.playPop();
-                        setFormData((prev) => ({ ...prev, city: '' }));
-                        validateField('city', '');
-                        setTouched((prev) => ({ ...prev, city: true }));
-                      }}
-                    >
-                      <X size={15} />
-                    </button>
-                  ) : isCityValid ? (
+                  {isCityValid && (
                     <CheckCircle2 size={18} className="field-valid-icon" />
-                  ) : null}
+                  )}
                 </div>
 
                 {touched.city && errors.city && (
