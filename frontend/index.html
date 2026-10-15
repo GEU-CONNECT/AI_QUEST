@@ -14,22 +14,59 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=Outfit:wght@100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet" />
     <script>
       (function() {
-        function blockEvent(e) {
-          if (e.type === 'contextmenu' || e.button === 2 || e.which === 3 || (e.ctrlKey && e.button === 0)) {
-            var path = (window.location && window.location.pathname) || '';
-            var isExam = path.includes('/take') || path.includes('/quiz') || window.__QUIZX_LOCKDOWN__ || document.body?.classList?.contains('quizx-exam-lockdown');
-            if (isExam) {
-              e.preventDefault();
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              return false;
+        'use strict';
+        try {
+          var docProto = Document.prototype;
+          var origHiddenDesc = Object.getOwnPropertyDescriptor(docProto, 'hidden');
+          var origVisDesc = Object.getOwnPropertyDescriptor(docProto, 'visibilityState');
+          var origHasFocus = docProto.hasFocus;
+          var origAddEventListener = EventTarget.prototype.addEventListener;
+          var origRemoveEventListener = EventTarget.prototype.removeEventListener;
+
+          window.__NATIVE_SHIELD__ = {
+            hiddenGetter: (origHiddenDesc && origHiddenDesc.get) ? origHiddenDesc.get : null,
+            visGetter: (origVisDesc && origVisDesc.get) ? origVisDesc.get : null,
+            hasFocus: origHasFocus,
+            addEventListener: origAddEventListener,
+            removeEventListener: origRemoveEventListener
+          };
+
+          try {
+            if (origHiddenDesc && origHiddenDesc.get) {
+              Object.defineProperty(docProto, 'hidden', {
+                get: origHiddenDesc.get,
+                set: undefined,
+                configurable: false,
+                enumerable: origHiddenDesc.enumerable
+              });
+            }
+            if (origVisDesc && origVisDesc.get) {
+              Object.defineProperty(docProto, 'visibilityState', {
+                get: origVisDesc.get,
+                set: undefined,
+                configurable: false,
+                enumerable: origVisDesc.enumerable
+              });
+            }
+          } catch (_) {}
+
+          function blockEvent(e) {
+            if (e.type === 'contextmenu' || e.button === 2 || e.which === 3 || (e.ctrlKey && e.button === 0)) {
+              var path = (window.location && window.location.pathname) || '';
+              var isExam = path.includes('/take') || path.includes('/quiz') || window.__QUIZX_LOCKDOWN__ || (document.body && document.body.classList && document.body.classList.contains('quizx-exam-lockdown'));
+              if (isExam) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return false;
+              }
             }
           }
-        }
-        ['contextmenu', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'auxclick'].forEach(function(evt) {
-          window.addEventListener(evt, blockEvent, true);
-          document.addEventListener(evt, blockEvent, true);
-        });
+          ['contextmenu', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'auxclick'].forEach(function(evt) {
+            origAddEventListener.call(window, evt, blockEvent, true);
+            origAddEventListener.call(document, evt, blockEvent, true);
+          });
+        } catch (_) {}
       })();
     </script>
   </head>

@@ -598,13 +598,264 @@ const TakeQuiz = ({ user }) => {
     }
   };
 
-  // 2. Tab Switch, Window Blur & Always-Active Extension Detection (ZERO False Positives)
+  // Native Clean Prototype Extractor (Immune to extension tampering)
+  const getPristineGetters = useCallback(() => {
+    // 1. Try pre-captured native shield from index.html (runs before extension content scripts)
+    if (typeof window !== 'undefined' && window.__NATIVE_SHIELD__?.hiddenGetter && window.__NATIVE_SHIELD__?.visGetter) {
+      return {
+        hiddenGetter: window.__NATIVE_SHIELD__.hiddenGetter,
+        visGetter: window.__NATIVE_SHIELD__.visGetter,
+        hasFocus: window.__NATIVE_SHIELD__.hasFocus
+      };
+    }
+
+    // 2. Try pristine Document.prototype
+    try {
+      const proto = Document.prototype;
+      const hDesc = Object.getOwnPropertyDescriptor(proto, 'hidden');
+      const vDesc = Object.getOwnPropertyDescriptor(proto, 'visibilityState');
+      if (hDesc?.get && vDesc?.get) {
+        return {
+          hiddenGetter: hDesc.get,
+          visGetter: vDesc.get,
+          hasFocus: proto.hasFocus
+        };
+      }
+    } catch (_) {}
+
+    // 3. Dynamic sandboxed isolated iframe Realm
+    try {
+      let iframe = document.getElementById('quizx-clean-realm');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'quizx-clean-realm';
+        iframe.className = 'quizx-legit-sandbox';
+        iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;border:none;';
+        iframe.setAttribute('aria-hidden', 'true');
+        (document.body || document.documentElement).appendChild(iframe);
+      }
+      const iframeProto = iframe.contentWindow?.Document?.prototype;
+      const hDesc = iframeProto ? Object.getOwnPropertyDescriptor(iframeProto, 'hidden') : null;
+      const vDesc = iframeProto ? Object.getOwnPropertyDescriptor(iframeProto, 'visibilityState') : null;
+      return {
+        hiddenGetter: hDesc?.get || null,
+        visGetter: vDesc?.get || null,
+        hasFocus: iframeProto?.hasFocus || null
+      };
+    } catch (_) {
+      return { hiddenGetter: null, visGetter: null, hasFocus: null };
+    }
+  }, []);
+
+  const queryTrueHidden = useCallback((cleanGetters) => {
+    try {
+      if (cleanGetters?.hiddenGetter) {
+        return Boolean(cleanGetters.hiddenGetter.call(document));
+      }
+    } catch (_) {}
+    return Boolean(document.hidden);
+  }, []);
+
+  const queryTrueVisState = useCallback((cleanGetters) => {
+    try {
+      if (cleanGetters?.visGetter) {
+        return cleanGetters.visGetter.call(document);
+      }
+    } catch (_) {}
+    return document.visibilityState;
+  }, []);
+
+  const queryTrueHasFocus = useCallback((cleanGetters) => {
+    try {
+      if (cleanGetters?.hasFocus) {
+        return Boolean(cleanGetters.hasFocus.call(document));
+      }
+    } catch (_) {}
+    return typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+  }, []);
+
+  const checkAndPurgeExtensionTampering = useCallback((cleanGetters) => {
+    let tampered = false;
+    let reason = '';
+
+    // Check 1: Did an extension install an own property override on the document instance?
+    // In standard W3C DOM specifications, 'hidden' and 'visibilityState' belong to Document.prototype, NEVER document instance!
+    const docOwnHidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+    const docOwnVis = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    const docOwnWebkit = Object.getOwnPropertyDescriptor(document, 'webkitHidden');
+    const docOwnFocus = Object.getOwnPropertyDescriptor(document, 'hasFocus');
+
+    if (docOwnHidden || docOwnVis || docOwnWebkit || docOwnFocus) {
+      tampered = true;
+      reason = 'Prohibited visibility-spoofing extension detected (Always Active Window)';
+      // Immediately delete hijacked own properties so native prototype getters can function
+      try {
+        delete document.hidden;
+        delete document.visibilityState;
+        delete document.webkitHidden;
+        delete document.webkitVisibilityState;
+        delete document.hasFocus;
+      } catch (_) {}
+
+      // Re-anchor document.hidden as non-configurable, pointing directly to native C++ getter
+      try {
+        if (cleanGetters?.hiddenGetter) {
+          Object.defineProperty(document, 'hidden', {
+            get: () => cleanGetters.hiddenGetter.call(document),
+            configurable: false,
+            enumerable: true
+          });
+        }
+        if (cleanGetters?.visGetter) {
+          Object.defineProperty(document, 'visibilityState', {
+            get: () => cleanGetters.visGetter.call(document),
+            configurable: false,
+            enumerable: true
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Check 2: Check for prototype tampering (non-native function injected by userscript/extension)
+    const isNonNative = (fn) => {
+      try {
+        if (!fn) return false;
+        return !Function.prototype.toString.call(fn).includes('[native code]');
+      } catch (_) {
+        return false;
+      }
+    };
+
+    const protoVis = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+    const protoHid = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden');
+    if (isNonNative(protoVis?.get) || isNonNative(protoHid?.get) || isNonNative(Document.prototype.hasFocus)) {
+      tampered = true;
+      reason = 'Visibility prototype modified by browser extension';
+    }
+
+    // Check 3: Real hidden is true but spoofed property returns false
+    const realH = queryTrueHidden(cleanGetters);
+    if (realH === true && document.hidden === false) {
+      tampered = true;
+      reason = 'Always Active Window extension spoofing intercepted';
+    }
+
+    return { tampered, reason };
+  }, [queryTrueHidden]);
+
+  // 2. Ironclad Tab Switch, Window Blur & Extension Neutralizer (ZERO Bypass, ZERO False Positives)
   useEffect(() => {
     if (loading || accessRequired || isClosedError || submissionResult || isSubmitting || isSessionLocked) return;
 
-    // Standard W3C Page Visibility API (Fires when tab is hidden or minimized)
+    const cleanGetters = getPristineGetters();
+    let lostFocusStart = 0;
+
+    // Check & purge immediately on start
+    const initialCheck = checkAndPurgeExtensionTampering(cleanGetters);
+    if (initialCheck.tampered) {
+      applyImmediateBlackout(true);
+      setIsFocusLost(true);
+      if (!hasLeftWindowRef.current) {
+        hasLeftWindowRef.current = true;
+        recordFocusViolation(initialCheck.reason || "Prohibited browser extension detected");
+      }
+    }
+
+    // High-Frequency (200ms) Independent Proctoring & Integrity Pulse
+    // Does NOT depend on events (bypasses any extension that called stopImmediatePropagation())!
+    const pulseInterval = setInterval(() => {
+      if (isSessionLocked || isSubmitting || submissionResult || loading || accessRequired || isClosedError) return;
+
+      // A. Check for extension tampering
+      const check = checkAndPurgeExtensionTampering(cleanGetters);
+      if (check.tampered) {
+        applyImmediateBlackout(true);
+        setIsFocusLost(true);
+        if (!hasLeftWindowRef.current) {
+          hasLeftWindowRef.current = true;
+          recordFocusViolation(check.reason || "Prohibited browser extension detected");
+        }
+        return;
+      }
+
+      // B. Query true C++ visibility state directly
+      const isActuallyHidden = queryTrueHidden(cleanGetters);
+      const currentVis = queryTrueVisState(cleanGetters);
+
+      if (isActuallyHidden || currentVis === 'hidden') {
+        applyImmediateBlackout(true);
+        setIsFocusLost(true);
+        if (!hasLeftWindowRef.current) {
+          hasLeftWindowRef.current = true;
+          recordFocusViolation("Tab switch / backgrounded window (Proctoring Shield)");
+        }
+        return;
+      }
+
+      // C. True Focus Loss Check (Alt+Tab, multi-monitor click, app switch)
+      // Only active when candidate is inside fullscreen exam mode and past the initial grace period
+      const isExamActive = isFullscreenModeRef.current || isIOSDevice();
+      const pastGrace = Date.now() > fullscreenGraceRef.current;
+
+      if (isExamActive && pastGrace) {
+        const hasFocus = queryTrueHasFocus(cleanGetters);
+        if (!hasFocus) {
+          if (!lostFocusStart) {
+            lostFocusStart = Date.now();
+          } else if (Date.now() - lostFocusStart > 650) {
+            // Sustained focus loss for > 650ms
+            applyImmediateBlackout(true);
+            setIsFocusLost(true);
+            if (!hasLeftWindowRef.current) {
+              hasLeftWindowRef.current = true;
+              recordFocusViolation("Window focus lost (Switched application or external monitor)");
+            }
+          }
+        } else {
+          lostFocusStart = 0;
+          if (hasLeftWindowRef.current && !isActuallyHidden) {
+            hasLeftWindowRef.current = false;
+            applyImmediateBlackout(false);
+            setIsFocusLost(false);
+          }
+        }
+      } else {
+        lostFocusStart = 0;
+      }
+
+      // D. Neutralize rogue injected DOM elements from cheat extensions
+      try {
+        const rogueSelectors = [
+          '[id*="chatgpt"]',
+          '[class*="chatgpt"]',
+          '[id*="monica"]',
+          '[class*="monica"]',
+          '[id*="merlin"]',
+          '[class*="merlin"]',
+          '[id*="sider-"]',
+          '[id*="harpa-"]',
+          '[id*="always-active"]',
+          '[class*="always-active"]',
+          '[data-always-active]',
+          '#monica-content-root',
+          'div[style*="z-index: 2147483647"]',
+          'div[style*="z-index: 99999999"]'
+        ];
+        const rogueEls = document.querySelectorAll(rogueSelectors.join(','));
+        rogueEls.forEach((el) => {
+          if (el.id !== 'exam-blackout-shield' && el.id !== 'root' && !document.getElementById('root')?.contains(el)) {
+            el.style.display = 'none';
+            el.style.pointerEvents = 'none';
+            el.remove();
+          }
+        });
+      } catch (_) {}
+    }, 200);
+
+    // Standard W3C Page Visibility Event Handler (Capturing phase)
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      const isHidden = queryTrueHidden(cleanGetters);
+      if (isHidden) {
         applyImmediateBlackout(true);
         setIsFocusLost(true);
         if (!hasLeftWindowRef.current) {
@@ -624,7 +875,7 @@ const TakeQuiz = ({ user }) => {
       setIsFocusLost(false);
     };
 
-    // Mobile / iOS Safari App Switch & Tab Departure Guard (Guaranteed to fire on iOS app switch)
+    // Mobile / iOS Safari App Switch Guard
     const handlePageHide = () => {
       applyImmediateBlackout(true);
       setIsFocusLost(true);
@@ -634,7 +885,6 @@ const TakeQuiz = ({ user }) => {
       }
     };
 
-    // iOS Safari BFCache & App-Return Resumption Guard
     const handlePageShow = (e) => {
       if (e.persisted || hasLeftWindowRef.current) {
         hasLeftWindowRef.current = false;
@@ -644,10 +894,9 @@ const TakeQuiz = ({ user }) => {
       }
     };
 
-    // Mobile Edge-Swipe Navigation Interceptor (Detects horizontal app-switch or history peek gesture)
+    // Mobile Edge-Swipe Navigation Interceptor
     let touchStartX = 0;
     let touchStartY = 0;
-
     const handleTouchStart = (e) => {
       if (e.touches && e.touches.length > 0) {
         touchStartX = e.touches[0].clientX;
@@ -663,7 +912,6 @@ const TakeQuiz = ({ user }) => {
       const diffX = Math.abs(touchX - touchStartX);
       const diffY = Math.abs(touchY - touchStartY);
 
-      // Edge gesture swipe check (touch within 40px of left/right border, dragging horizontally)
       const isEdge = touchStartX < 40 || touchStartX > (window.innerWidth - 40);
       if (isEdge && diffX > 35 && diffX > diffY * 1.3) {
         applyImmediateBlackout(true);
@@ -672,57 +920,83 @@ const TakeQuiz = ({ user }) => {
       }
     };
 
-    // Chrome/Chromium Hardware Compositor RAF Throttling (Interception for Always-Active Extensions)
-    // When a tab is in the background, Chrome compositor freezes requestAnimationFrame.
-    // In normal page usage (mouse movement, answering, scrolling), RAF runs at 60 FPS (~16ms).
-    // A gap of > 2500ms in RAF ONLY happens if the tab was frozen/hidden in background.
-    let lastRafTime = performance.now();
-    let rafId = null;
-    let isInitialized = false;
+    // Isolated Blob Web Worker Heartbeat (Extensions cannot penetrate Web Workers)
+    let worker = null;
+    try {
+      const workerBlob = new Blob([`
+        let last = performance.now();
+        setInterval(() => {
+          const now = performance.now();
+          postMessage({ time: now, interval: now - last });
+          last = now;
+        }, 250);
+      `], { type: 'application/javascript' });
+      worker = new Worker(URL.createObjectURL(workerBlob));
+      let lastWorkerMsgTime = Date.now();
 
-    // 2-second grace period after mount so initial rendering does not trigger false positives
-    const initTimer = setTimeout(() => {
-      lastRafTime = performance.now();
-      isInitialized = true;
-    }, 2000);
+      worker.onmessage = () => {
+        const now = Date.now();
+        const gap = now - lastWorkerMsgTime;
+        lastWorkerMsgTime = now;
 
-    const rafCheck = (now) => {
-      if (isInitialized && !isFocusLost && !isSessionLocked && !isSubmitting && !submissionResult) {
-        const delta = now - lastRafTime;
-        if (delta > 2500 && (document.fullscreenElement || isIOSDevice())) {
-          applyImmediateBlackout(true);
-          setIsFocusLost(true);
-          if (!hasLeftWindowRef.current) {
-            hasLeftWindowRef.current = true;
-            recordFocusViolation("Background tab switch detected (Window compositor suspended / Always-Active bypass intercepted)");
+        if (isFullscreenModeRef.current && Date.now() > fullscreenGraceRef.current && gap > 3200) {
+          if (!isSessionLocked && !isSubmitting && !submissionResult) {
+            applyImmediateBlackout(true);
+            setIsFocusLost(true);
+            if (!hasLeftWindowRef.current) {
+              hasLeftWindowRef.current = true;
+              recordFocusViolation("Background tab suspension detected (Process scheduler throttled)");
+            }
           }
         }
-      }
-      lastRafTime = now;
-      rafId = requestAnimationFrame(rafCheck);
-    };
-    rafId = requestAnimationFrame(rafCheck);
+      };
+    } catch (_) {}
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleWindowFocus);
-    window.addEventListener("pagehide", handlePageHide);
-    window.addEventListener("pageshow", handlePageShow);
-    document.addEventListener("freeze", handlePageHide);
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    // Register listeners using native EventTarget.prototype.addEventListener
+    const addNative = (target, evt, handler, options) => {
+      try {
+        if (window.__NATIVE_SHIELD__?.addEventListener) {
+          window.__NATIVE_SHIELD__.addEventListener.call(target, evt, handler, options);
+          return;
+        }
+      } catch (_) {}
+      target.addEventListener(evt, handler, options);
+    };
+
+    const removeNative = (target, evt, handler, options) => {
+      try {
+        if (window.__NATIVE_SHIELD__?.removeEventListener) {
+          window.__NATIVE_SHIELD__.removeEventListener.call(target, evt, handler, options);
+          return;
+        }
+      } catch (_) {}
+      target.removeEventListener(evt, handler, options);
+    };
+
+    addNative(document, "visibilitychange", handleVisibilityChange, { capture: true, passive: true });
+    addNative(window, "visibilitychange", handleVisibilityChange, { capture: true, passive: true });
+    addNative(window, "focus", handleWindowFocus, { capture: true, passive: true });
+    addNative(window, "pagehide", handlePageHide, { capture: true, passive: true });
+    addNative(window, "pageshow", handlePageShow, { capture: true, passive: true });
+    addNative(document, "freeze", handlePageHide, { capture: true, passive: true });
+    addNative(window, "touchstart", handleTouchStart, { passive: true });
+    addNative(window, "touchmove", handleTouchMove, { passive: true });
 
     return () => {
-      clearTimeout(initTimer);
-      if (rafId) cancelAnimationFrame(rafId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleWindowFocus);
-      window.removeEventListener("pagehide", handlePageHide);
-      window.removeEventListener("pageshow", handlePageShow);
-      document.removeEventListener("freeze", handlePageHide);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
+      clearInterval(pulseInterval);
+      if (worker) {
+        try { worker.terminate(); } catch (_) {}
+      }
+      removeNative(document, "visibilitychange", handleVisibilityChange, { capture: true });
+      removeNative(window, "visibilitychange", handleVisibilityChange, { capture: true });
+      removeNative(window, "focus", handleWindowFocus, { capture: true });
+      removeNative(window, "pagehide", handlePageHide, { capture: true });
+      removeNative(window, "pageshow", handlePageShow, { capture: true });
+      removeNative(document, "freeze", handlePageHide, { capture: true });
+      removeNative(window, "touchstart", handleTouchStart);
+      removeNative(window, "touchmove", handleTouchMove);
     };
-  }, [loading, accessRequired, isClosedError, notStartedData, submissionResult, isSubmitting, isSessionLocked, proctoringRules, quizId, applyImmediateBlackout]);
+  }, [loading, accessRequired, isClosedError, notStartedData, submissionResult, isSubmitting, isSessionLocked, proctoringRules, quizId, applyImmediateBlackout, getPristineGetters, queryTrueHidden, queryTrueVisState, queryTrueHasFocus, checkAndPurgeExtensionTampering]);
 
   // 3a. Unconditional Right-Click & Context-Menu Lockdown (Ironclad & Omnipresent)
   useEffect(() => {
@@ -1880,7 +2154,7 @@ const TakeQuiz = ({ user }) => {
               type="button"
               onClick={async () => {
                 try {
-                  fullscreenGraceRef.current = Date.now() + 1000;
+                  fullscreenGraceRef.current = Date.now() + 2000;
                   wasInFullscreenRef.current = true;
                   isFullscreenModeRef.current = true;
                   hasLeftWindowRef.current = false;
@@ -1910,7 +2184,7 @@ const TakeQuiz = ({ user }) => {
                   }, 100);
                 } catch (err) {
                   setIsFullscreenMode(true);
-                  fullscreenGraceRef.current = Date.now() + 1000;
+                  fullscreenGraceRef.current = Date.now() + 2000;
                 }
               }}
               className="w-full py-3 px-6 rounded-2xl bg-[#1c1f58] hover:bg-[#252975] text-white font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
@@ -2528,7 +2802,7 @@ const TakeQuiz = ({ user }) => {
                 setIsFocusLost(false);
 
                 try {
-                  fullscreenGraceRef.current = Date.now() + 600;
+                  fullscreenGraceRef.current = Date.now() + 1500;
                   if (!document.fullscreenElement) {
                     if (document.documentElement.requestFullscreen) {
                       await document.documentElement.requestFullscreen();
