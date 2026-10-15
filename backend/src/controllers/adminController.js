@@ -237,26 +237,47 @@ const getEventOverview = async (req, res, next) => {
       inProgressCount,
       lockedCount,
       submittedCount,
-      quizzesCount
+      quizzesCount,
+      subAdminsCount
     ] = await Promise.all([
       prisma.user.count({ where: { role: 'STUDENT' } }),
       prisma.quizSubmission.count(),
       prisma.quizSubmission.count({ where: { status: 'IN_PROGRESS' } }),
       prisma.quizSubmission.count({ where: { status: 'LOCKED' } }),
-      prisma.quizSubmission.count({ where: { status: 'SUBMITTED' } }),
-      prisma.quiz.count()
+      prisma.quizSubmission.count({ where: { status: { in: ['SUBMITTED', 'EVALUATED'] } } }),
+      prisma.quiz.count(),
+      prisma.user.count({ where: { role: 'SUBADMIN' } })
     ]);
+
+    let overallPassRate = 0;
+    let overallAvgScore = 0;
+    if (submittedCount > 0) {
+      const agg = await prisma.quizSubmission.aggregate({
+        where: { status: { in: ['SUBMITTED', 'EVALUATED'] } },
+        _avg: { score: true }
+      });
+      const passedCount = await prisma.quizSubmission.count({
+        where: { status: { in: ['SUBMITTED', 'EVALUATED'] }, isPassed: true }
+      });
+      overallAvgScore = agg._avg?.score ? parseFloat(agg._avg.score.toFixed(1)) : 0;
+      overallPassRate = Math.round((passedCount / submittedCount) * 100);
+    }
 
     res.json({
       success: true,
       stats: {
         totalRegistered,
+        totalStudents: totalRegistered,
         totalSubmissions,
         inProgressCount,
         lockedCount,
         submittedCount,
         notStartedCount: Math.max(0, totalRegistered - (inProgressCount + lockedCount + submittedCount)),
-        quizzesCount
+        quizzesCount,
+        totalQuizzes: quizzesCount,
+        subAdminsCount,
+        overallPassRate,
+        overallAvgScore
       }
     });
   } catch (error) {

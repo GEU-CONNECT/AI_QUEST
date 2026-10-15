@@ -1,8 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
-
-const prisma = new PrismaClient();
+const prisma = require('../src/config/db');
 
 const QUESTIONS_DATA = [
   {
@@ -395,71 +393,75 @@ async function main() {
     console.log(`✓ Official Quiz already present (ID: ${existingQuiz.id})`);
   }
 
-  // 5. Seed a few sample students for demonstration
-  const sampleStudents = [
-    {
-      name: 'Pragya Karnwal',
-      mobileNo: '9812345678',
-      email: 'pragya.karnwal@gmail.com',
-      studentClass: 'Class 12th',
-      stream: 'Science (PCM)',
-      schoolName: 'Doon International School, Dehradun',
-      parentName: 'Rajesh Karnwal',
-      parentContact: '9812345670',
-      city: 'Dehradun',
-      labNumber: 'LAB-01'
-    },
-    {
-      name: 'Aarav Sharma',
-      mobileNo: '9876543210',
-      email: 'aarav.sharma@gmail.com',
-      studentClass: 'Class 12th',
-      stream: 'Science (PCM)',
-      schoolName: "St. Joseph's Academy, Dehradun",
-      parentName: 'Vikram Sharma',
-      parentContact: '9876543219',
-      city: 'Dehradun',
-      labNumber: 'LAB-01'
-    },
-    {
-      name: 'Ananya Joshi',
-      mobileNo: '9833445566',
-      email: 'ananya.joshi@gmail.com',
-      studentClass: 'Class 11th',
-      stream: 'Science (PCB)',
-      schoolName: 'Graphic Era Global School, Dehradun',
-      parentName: 'Sunil Joshi',
-      parentContact: '9833445560',
-      city: 'Dehradun',
-      labNumber: 'LAB-02'
-    }
-  ];
-
-  const studentPass = await bcrypt.hash('1234', 10);
-  for (let sIdx = 0; sIdx < sampleStudents.length; sIdx++) {
-    const s = sampleStudents[sIdx];
-    const regId = `GEU-AIQ-2026-1000${sIdx + 1}`;
-    await prisma.user.upsert({
-      where: { mobileNo: s.mobileNo },
-      update: {},
-      create: {
-        registrationId: regId,
-        name: s.name,
-        mobileNo: s.mobileNo,
-        email: s.email,
-        passwordHash: studentPass,
-        role: 'STUDENT',
-        studentClass: s.studentClass,
-        stream: s.stream,
-        schoolName: s.schoolName,
-        parentName: s.parentName,
-        parentContact: s.parentContact,
-        city: s.city,
-        labNumber: s.labNumber
+  // 5. Seed sample students ONLY if explicitly requested via SEED_SAMPLE_STUDENTS=true
+  if (process.env.SEED_SAMPLE_STUDENTS === 'true') {
+    const sampleStudents = [
+      {
+        name: 'Pragya Karnwal',
+        mobileNo: '9812345678',
+        email: 'pragya.karnwal@gmail.com',
+        studentClass: 'Class 12th',
+        stream: 'Science (PCM)',
+        schoolName: 'Doon International School, Dehradun',
+        parentName: 'Rajesh Karnwal',
+        parentContact: '9812345670',
+        city: 'Dehradun',
+        labNumber: 'LAB-01'
+      },
+      {
+        name: 'Aarav Sharma',
+        mobileNo: '9876543210',
+        email: 'aarav.sharma@gmail.com',
+        studentClass: 'Class 12th',
+        stream: 'Science (PCM)',
+        schoolName: "St. Joseph's Academy, Dehradun",
+        parentName: 'Vikram Sharma',
+        parentContact: '9876543219',
+        city: 'Dehradun',
+        labNumber: 'LAB-01'
+      },
+      {
+        name: 'Ananya Joshi',
+        mobileNo: '9833445566',
+        email: 'ananya.joshi@gmail.com',
+        studentClass: 'Class 11th',
+        stream: 'Science (PCB)',
+        schoolName: 'Graphic Era Global School, Dehradun',
+        parentName: 'Sunil Joshi',
+        parentContact: '9833445560',
+        city: 'Dehradun',
+        labNumber: 'LAB-02'
       }
-    });
+    ];
+
+    const studentPass = await bcrypt.hash('1234', 10);
+    for (let sIdx = 0; sIdx < sampleStudents.length; sIdx++) {
+      const s = sampleStudents[sIdx];
+      const regId = `GEU-AIQ-2026-1000${sIdx + 1}`;
+      await prisma.user.upsert({
+        where: { mobileNo: s.mobileNo },
+        update: {},
+        create: {
+          registrationId: regId,
+          name: s.name,
+          mobileNo: s.mobileNo,
+          email: s.email,
+          passwordHash: studentPass,
+          role: 'STUDENT',
+          studentClass: s.studentClass,
+          stream: s.stream,
+          schoolName: s.schoolName,
+          parentName: s.parentName,
+          parentContact: s.parentContact,
+          city: s.city,
+          labNumber: s.labNumber
+        }
+      });
+    }
+    console.log(`✓ ${sampleStudents.length} sample candidates seeded (PIN: 1234)`);
+  } else {
+    console.log('✓ Clean slate: No sample students seeded. Student database remains 100% clean for live registrations.');
   }
-  console.log(`✓ ${sampleStudents.length} sample candidates seeded (PIN: 1234)`);
   console.log('--- Seeding Complete Successfully! ---');
 }
 
