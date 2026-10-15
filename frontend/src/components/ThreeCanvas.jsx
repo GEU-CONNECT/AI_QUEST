@@ -1,10 +1,26 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { getLiteModeState, setLiteModeState } from '../utils/performance';
 
 export default function ThreeCanvas() {
   const mountRef = useRef(null);
+  const [isLite, setIsLite] = useState(getLiteModeState());
+
+  // Listen for manual or automatic performance mode changes
+  useEffect(() => {
+    const handlePerfChange = (e) => {
+      setIsLite(Boolean(e.detail?.isLite));
+    };
+    window.addEventListener('aiquest-perf-change', handlePerfChange);
+    return () => window.removeEventListener('aiquest-perf-change', handlePerfChange);
+  }, []);
 
   useEffect(() => {
+    if (isLite) {
+      // In Lite Mode, completely skip Three.js initialization (0% GPU/CPU)
+      return;
+    }
+
     const container = mountRef.current;
     if (!container) return;
 
@@ -18,9 +34,15 @@ export default function ThreeCanvas() {
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 0, 18);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    // Optimized renderer settings: Cap pixelRatio at 1.25 to prevent CPU/GPU saturation
+    const renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      alpha: true,
+      powerPreference: 'high-performance',
+      precision: 'mediump',
+    });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.35;
     container.appendChild(renderer.domElement);
@@ -29,17 +51,17 @@ export default function ThreeCanvas() {
     const ambientLight = new THREE.AmbientLight(0x162c68, 2.5);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffea85, 2.8);
+    const dirLight = new THREE.DirectionalLight(0xffea85, 2.5);
     dirLight.position.set(6, 14, 12);
     scene.add(dirLight);
 
     // Golden Point Light tracking mouse
-    const goldLight = new THREE.PointLight(0xffc107, 4.5, 35);
+    const goldLight = new THREE.PointLight(0xffc107, 4.0, 32);
     goldLight.position.set(0, 2, 8);
     scene.add(goldLight);
 
     // Electric Cyan Point Light for AI theme
-    const cyanLight = new THREE.PointLight(0x00e5ff, 4.0, 30);
+    const cyanLight = new THREE.PointLight(0x00e5ff, 3.5, 28);
     cyanLight.position.set(-8, -4, 5);
     scene.add(cyanLight);
 
@@ -52,24 +74,24 @@ export default function ThreeCanvas() {
     const icoGeom = new THREE.IcosahedronGeometry(2.8, 1);
     const icoMat = new THREE.MeshStandardMaterial({
       color: 0xffd700,
-      metalness: 0.95,
-      roughness: 0.12,
+      metalness: 0.9,
+      roughness: 0.2,
       wireframe: true,
-      wireframeLinewidth: 2,
+      wireframeLinewidth: 1,
       emissive: 0x664800,
-      emissiveIntensity: 0.45,
+      emissiveIntensity: 0.4,
     });
     const icoMesh = new THREE.Mesh(icoGeom, icoMat);
     coreGroup.add(icoMesh);
 
-    // Inner Glowing Cyan Torus Knot (AI Neural Node)
-    const torusGeom = new THREE.TorusKnotGeometry(1.4, 0.32, 100, 18);
+    // Inner Glowing Cyan Torus Knot
+    const torusGeom = new THREE.TorusKnotGeometry(1.4, 0.32, 64, 12);
     const torusMat = new THREE.MeshStandardMaterial({
       color: 0x0066ff,
       metalness: 0.8,
       roughness: 0.2,
       emissive: 0x0044ff,
-      emissiveIntensity: 0.7,
+      emissiveIntensity: 0.65,
     });
     const torusMesh = new THREE.Mesh(torusGeom, torusMat);
     coreGroup.add(torusMesh);
@@ -81,26 +103,13 @@ export default function ThreeCanvas() {
       metalness: 0.3,
       roughness: 0.1,
       emissive: 0x00f5ff,
-      emissiveIntensity: 0.9,
+      emissiveIntensity: 0.85,
     });
     const crystalMesh = new THREE.Mesh(crystalGeom, crystalMat);
     coreGroup.add(crystalMesh);
 
-    // Vertex points around the core
-    const dotGeom = new THREE.BufferGeometry();
-    const pos = icoGeom.attributes.position.array;
-    dotGeom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const dotMat = new THREE.PointsMaterial({
-      color: 0xffe680,
-      size: 0.22,
-      transparent: true,
-      opacity: 0.95,
-    });
-    const dotPoints = new THREE.Points(dotGeom, dotMat);
-    coreGroup.add(dotPoints);
-
-    // 3D Orbital Rings around the core
-    const ringGeom = new THREE.TorusGeometry(3.6, 0.04, 16, 100);
+    // 3D Orbital Rings
+    const ringGeom = new THREE.TorusGeometry(3.6, 0.04, 12, 64);
     const ringMat = new THREE.MeshStandardMaterial({
       color: 0xffb703,
       metalness: 0.9,
@@ -115,7 +124,7 @@ export default function ThreeCanvas() {
     ringMesh2.rotation.y = Math.PI / 2.5;
     coreGroup.add(ringMesh2);
 
-    // --- 3D Golden Ribbons & Curving Streamers ---
+    // --- Curved Streamers ---
     const ribbonGroup = new THREE.Group();
     scene.add(ribbonGroup);
 
@@ -125,37 +134,35 @@ export default function ThreeCanvas() {
       roughness: 0.2,
       side: THREE.DoubleSide,
       emissive: 0x332000,
-      emissiveIntensity: 0.3,
+      emissiveIntensity: 0.25,
     });
 
-    const createCurvedRibbon = (controlPoints, radius = 0.16) => {
+    const createCurvedRibbon = (controlPoints, radius = 0.18) => {
       const curve = new THREE.CatmullRomCurve3(controlPoints);
-      const tubeGeom = new THREE.TubeGeometry(curve, 72, radius, 8, false);
+      const tubeGeom = new THREE.TubeGeometry(curve, 48, radius, 6, false);
       return new THREE.Mesh(tubeGeom, ribbonMaterial);
     };
 
-    // Left flowing golden ribbon
     const leftRibbon = createCurvedRibbon([
       new THREE.Vector3(-15, 10, -5),
       new THREE.Vector3(-10, 4, -1),
       new THREE.Vector3(-13, -2, 3),
       new THREE.Vector3(-8, -7, 1),
       new THREE.Vector3(-12, -12, -4),
-    ], 0.24);
+    ], 0.22);
     ribbonGroup.add(leftRibbon);
 
-    // Right flowing golden ribbon
     const rightRibbon = createCurvedRibbon([
       new THREE.Vector3(15, 11, -6),
       new THREE.Vector3(10, 5, -1),
       new THREE.Vector3(13, -1, 3),
       new THREE.Vector3(9, -8, 0),
       new THREE.Vector3(13, -13, -5),
-    ], 0.22);
+    ], 0.20);
     ribbonGroup.add(rightRibbon);
 
-    // --- Floating Golden Confetti & Shimmering Flakes ---
-    const confettiCount = 130;
+    // --- Floating Confetti (Optimized to 50 items) ---
+    const confettiCount = 50;
     const confettiGroup = new THREE.Group();
     scene.add(confettiGroup);
 
@@ -166,8 +173,8 @@ export default function ThreeCanvas() {
     for (let i = 0; i < confettiCount; i++) {
       const mat = new THREE.MeshStandardMaterial({
         color: confettiColors[i % confettiColors.length],
-        metalness: 0.9,
-        roughness: 0.18,
+        metalness: 0.8,
+        roughness: 0.2,
         side: THREE.DoubleSide,
       });
       const mesh = new THREE.Mesh(confettiGeom, mat);
@@ -185,9 +192,9 @@ export default function ThreeCanvas() {
       );
 
       const rotSpeed = {
-        x: (Math.random() - 0.5) * 0.035,
-        y: (Math.random() - 0.5) * 0.04,
-        z: (Math.random() - 0.5) * 0.025,
+        x: (Math.random() - 0.5) * 0.03,
+        y: (Math.random() - 0.5) * 0.035,
+        z: (Math.random() - 0.5) * 0.02,
       };
 
       const initialY = mesh.position.y;
@@ -195,8 +202,8 @@ export default function ThreeCanvas() {
       confettiGroup.add(mesh);
     }
 
-    // --- Neural Starfield / Data Nodes ---
-    const starCount = 900;
+    // --- Neural Starfield (Optimized to 350 particles) ---
+    const starCount = 350;
     const starGeom = new THREE.BufferGeometry();
     const starPositions = new Float32Array(starCount * 3);
     const starColors = new Float32Array(starCount * 3);
@@ -222,31 +229,48 @@ export default function ThreeCanvas() {
     starGeom.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
 
     const starMat = new THREE.PointsMaterial({
-      size: 0.09,
+      size: 0.1,
       vertexColors: true,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.75,
     });
     const starField = new THREE.Points(starGeom, starMat);
     scene.add(starField);
 
-    // --- Interactive Mouse Parallax & Dynamic Light Tracking ---
+    // --- Mouse Parallax & Dynamic Light Tracking ---
     const mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
     let activityPulse = 0;
 
     const handleMouseMove = (e) => {
-      const normX = (e.clientX / window.innerWidth) * 2 - 1;
-      const normY = -(e.clientY / window.innerHeight) * 2 + 1;
-      mouse.targetX = normX;
-      mouse.targetY = normY;
+      mouse.targetX = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.targetY = -(e.clientY / window.innerHeight) * 2 + 1;
     };
 
     const handleFormActivity = (e) => {
-      activityPulse = Math.min(activityPulse + (e.detail?.intensity || 0.8), 3.0);
+      activityPulse = Math.min(activityPulse + (e.detail?.intensity || 0.6), 2.5);
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('ai-quest-activity', handleFormActivity);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('ai-quest-activity', handleFormActivity, { passive: true });
+
+    // --- Keystroke / Input Focus Throttling ---
+    // When student is typing in form inputs, pause 3D animation loop to prevent input lag
+    let isTypingFocused = false;
+    const handleFocusIn = (e) => {
+      if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) {
+        isTypingFocused = true;
+      }
+    };
+    const handleFocusOut = () => {
+      isTypingFocused = false;
+    };
+    document.addEventListener('focusin', handleFocusIn, { passive: true });
+    document.addEventListener('focusout', handleFocusOut, { passive: true });
+
+    // --- Dynamic FPS Monitor for Auto-Downgrade on Slow Machines ---
+    let frameCount = 0;
+    let lastFpsCheck = performance.now();
+    let lowFpsStreak = 0;
 
     // --- Animation Loop ---
     let animationFrameId;
@@ -254,62 +278,82 @@ export default function ThreeCanvas() {
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
+
+      // Measure FPS every 60 frames
+      frameCount++;
+      if (frameCount >= 60) {
+        const now = performance.now();
+        const duration = (now - lastFpsCheck) / 1000;
+        const currentFps = frameCount / duration;
+        frameCount = 0;
+        lastFpsCheck = now;
+
+        if (currentFps < 22) {
+          lowFpsStreak++;
+          if (lowFpsStreak >= 2) {
+            // CPU/GPU struggle detected! Auto-switch to Lite Mode
+            console.warn(`Low FPS (${Math.round(currentFps)}) detected. Auto-activating Smooth Mode.`);
+            setLiteModeState(true);
+            return;
+          }
+        } else {
+          lowFpsStreak = 0;
+        }
+      }
+
+      // If typing in input, skip rendering this frame to yield CPU entirely to browser
+      if (isTypingFocused) {
+        return;
+      }
+
       const elapsedTime = clock.getElapsedTime();
 
       // Decay activity pulse
       activityPulse = Math.max(0, activityPulse * 0.94);
 
       // Smooth mouse lerp
-      mouse.x += (mouse.targetX - mouse.x) * 0.06;
-      mouse.y += (mouse.targetY - mouse.y) * 0.06;
+      mouse.x += (mouse.targetX - mouse.x) * 0.05;
+      mouse.y += (mouse.targetY - mouse.y) * 0.05;
 
       // Parallax camera movement
-      camera.position.x = mouse.x * 2.8;
-      camera.position.y = mouse.y * 1.8;
+      camera.position.x = mouse.x * 2.2;
+      camera.position.y = mouse.y * 1.4;
       camera.lookAt(0, 0, 0);
 
-      // Light coordinates following mouse in world space + activity surge
-      goldLight.position.x = mouse.x * 14;
-      goldLight.position.y = mouse.y * 9 + 2;
-      goldLight.intensity = 4.5 + activityPulse * 3;
+      // Lights
+      goldLight.position.x = mouse.x * 12;
+      goldLight.position.y = mouse.y * 8 + 2;
+      cyanLight.position.x = -mouse.x * 10 - 4;
+      cyanLight.position.y = -mouse.y * 7 - 2;
 
-      cyanLight.position.x = -mouse.x * 12 - 4;
-      cyanLight.position.y = -mouse.y * 8 - 2;
-      cyanLight.intensity = 4.0 + activityPulse * 2.5;
-
-      // AI Quantum Core Rotation with activity surge
-      const currentSpeed = 1.0 + activityPulse * 1.5;
-      coreGroup.rotation.y = elapsedTime * 0.4 * currentSpeed;
-      coreGroup.rotation.x = Math.sin(elapsedTime * 0.3) * 0.25;
+      // AI Core Rotation
+      const currentSpeed = 1.0 + activityPulse * 1.2;
+      coreGroup.rotation.y = elapsedTime * 0.35 * currentSpeed;
+      coreGroup.rotation.x = Math.sin(elapsedTime * 0.25) * 0.2;
       
-      icoMesh.rotation.z = elapsedTime * 0.2 * currentSpeed;
-      torusMesh.rotation.x = elapsedTime * 0.5 * currentSpeed;
-      torusMesh.rotation.y = elapsedTime * 0.7 * currentSpeed;
-      crystalMesh.rotation.y = -elapsedTime * 1.0 * currentSpeed;
+      icoMesh.rotation.z = elapsedTime * 0.18 * currentSpeed;
+      torusMesh.rotation.x = elapsedTime * 0.45 * currentSpeed;
+      torusMesh.rotation.y = elapsedTime * 0.6 * currentSpeed;
+      crystalMesh.rotation.y = -elapsedTime * 0.85 * currentSpeed;
       
-      ringMesh1.rotation.z = elapsedTime * 0.35 * currentSpeed;
-      ringMesh2.rotation.x = -elapsedTime * 0.4 * currentSpeed;
-
-      // Core breath oscillation
-      coreGroup.position.y = 4.2 + Math.sin(elapsedTime * 1.4) * 0.45;
+      ringMesh1.rotation.z = elapsedTime * 0.3 * currentSpeed;
+      ringMesh2.rotation.x = -elapsedTime * 0.35 * currentSpeed;
+      coreGroup.position.y = 4.2 + Math.sin(elapsedTime * 1.2) * 0.4;
 
       // Ribbons undulating
-      leftRibbon.rotation.z = Math.sin(elapsedTime * 0.6) * 0.1;
-      rightRibbon.rotation.z = Math.cos(elapsedTime * 0.6) * 0.1;
-      ribbonGroup.position.y = Math.sin(elapsedTime * 0.8) * 0.3;
+      leftRibbon.rotation.z = Math.sin(elapsedTime * 0.5) * 0.08;
+      rightRibbon.rotation.z = Math.cos(elapsedTime * 0.5) * 0.08;
 
       // Confetti Fluttering Animation
       confettiItems.forEach((item, index) => {
         item.mesh.rotation.x += item.rotSpeed.x * currentSpeed;
         item.mesh.rotation.y += item.rotSpeed.y * currentSpeed;
         item.mesh.rotation.z += item.rotSpeed.z * currentSpeed;
-
-        item.mesh.position.y = item.initialY + Math.sin(elapsedTime * 1.5 + index) * 0.9;
-        item.mesh.position.x += Math.sin(elapsedTime * 0.8 + index) * 0.006;
+        item.mesh.position.y = item.initialY + Math.sin(elapsedTime * 1.2 + index) * 0.8;
       });
 
       // Starfield slow drift
-      starField.rotation.y = elapsedTime * 0.025;
+      starField.rotation.y = elapsedTime * 0.02;
 
       renderer.render(scene, camera);
     };
@@ -323,7 +367,7 @@ export default function ThreeCanvas() {
       camera.aspect = newWidth / newHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(newWidth, newHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
     };
 
     window.addEventListener('resize', handleResize);
@@ -333,8 +377,11 @@ export default function ThreeCanvas() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('ai-quest-activity', handleFormActivity);
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
       cancelAnimationFrame(animationFrameId);
-      if (container && renderer.domElement) {
+
+      if (container && renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
       renderer.dispose();
@@ -350,7 +397,18 @@ export default function ThreeCanvas() {
       ringGeom.dispose();
       ringMat.dispose();
     };
-  }, []);
+  }, [isLite]);
+
+  if (isLite) {
+    // 0% CPU & 0% GPU ultra-smooth fallback for older PCs
+    return (
+      <div className="lite-mode-backdrop" aria-hidden="true">
+        <div className="lite-space-gradient" />
+        <div className="lite-ambient-circle lite-circle-1" />
+        <div className="lite-ambient-circle lite-circle-2" />
+      </div>
+    );
+  }
 
   return (
     <div

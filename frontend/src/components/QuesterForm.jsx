@@ -99,13 +99,13 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false);
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
 
-  // 3D Tilt State
+  // 3D Tilt & Performance State
   const cardRef = useRef(null);
+  const glareRef = useRef(null);
   const section1Ref = useRef(null);
   const section2Ref = useRef(null);
   const section3Ref = useRef(null);
   const schoolDropdownRef = useRef(null);
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0, gx: 50, gy: 50 });
 
   // Close school dropdown when clicking outside
   useEffect(() => {
@@ -169,7 +169,10 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
   };
 
   const handleCardMouseMove = (e) => {
+    // If Smooth/Lite mode is active, completely skip mouse tilt calculations
+    if (document.body.classList.contains('lite-mode')) return;
     if (!cardRef.current) return;
+
     const rect = cardRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -183,11 +186,24 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
     const gx = (x / rect.width) * 100;
     const gy = (y / rect.height) * 100;
 
-    setTilt({ rx, ry, gx, gy });
+    // Apply directly to DOM inside requestAnimationFrame - NO React re-renders!
+    requestAnimationFrame(() => {
+      if (cardRef.current) {
+        cardRef.current.style.transform = `perspective(1200px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+      }
+      if (glareRef.current) {
+        glareRef.current.style.background = `radial-gradient(circle at ${gx}% ${gy}%, rgba(255, 255, 255, 0.15) 0%, rgba(250, 204, 21, 0.05) 40%, transparent 70%)`;
+      }
+    });
   };
 
   const handleCardMouseLeave = () => {
-    setTilt({ rx: 0, ry: 0, gx: 50, gy: 50 });
+    if (cardRef.current) {
+      cardRef.current.style.transform = 'perspective(1200px) rotateX(0deg) rotateY(0deg)';
+    }
+    if (glareRef.current) {
+      glareRef.current.style.background = 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0%, rgba(250, 204, 21, 0.05) 40%, transparent 70%)';
+    }
   };
 
   // Section Validation & Completeness checks
@@ -413,16 +429,11 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
         onMouseMove={handleCardMouseMove}
         onMouseLeave={handleCardMouseLeave}
         className="form-card-container interactive-3d-card"
-        style={{
-          transform: `perspective(1200px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)`,
-        }}
       >
         {/* Dynamic Specular Glare Layer */}
         <div
+          ref={glareRef}
           className="card-specular-glare"
-          style={{
-            background: `radial-gradient(circle at ${tilt.gx}% ${tilt.gy}%, rgba(255, 255, 255, 0.15) 0%, rgba(250, 204, 21, 0.05) 40%, transparent 70%)`,
-          }}
         ></div>
 
         {/* Top Header Strip */}
