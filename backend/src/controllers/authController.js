@@ -136,6 +136,8 @@ const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(rawSecret, salt);
 
+    const sessionId = `sess_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+
     const user = await prisma.user.create({
       data: {
         registrationId: regId,
@@ -150,14 +152,17 @@ const register = async (req, res, next) => {
         parentName: parentName || 'Guardian',
         parentContact: cleanParentContact,
         city: city || 'Dehradun',
-        labNumber: assignedLab
+        labNumber: assignedLab,
+        activeSessionId: sessionId
       }
     });
 
-    // NOTE: No token generated here — user must log in manually after registration
+    const token = generateToken(user, sessionId);
+
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Please login with your Registration ID and password to continue.',
+      message: 'Candidate registration successful! Welcome to AI Quest 2026.',
+      token,
       regId,
       user: {
         id: user.id,

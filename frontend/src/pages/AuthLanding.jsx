@@ -57,11 +57,15 @@ export default function AuthLanding({ onLoginSuccess }) {
       const res = await api.post('/auth/register', formData);
 
       if (res.data?.success) {
-        // Do NOT store token or call onLoginSuccess — registration only
-        setRegId(res.data.regId);
+        if (res.data.token) {
+          localStorage.setItem('quizx_token', res.data.token);
+        }
+        if (res.data.user) {
+          localStorage.setItem('quizx_user', JSON.stringify(res.data.user));
+        }
         setIsSubmitting(false);
-        setShowModal(true);
-        // After modal is dismissed, user will be switched to login tab
+        // Instant direct navigation straight to Student Dashboard
+        handleLoginSuccess(res.data.user);
       }
     } catch (err) {
       setIsSubmitting(false);
