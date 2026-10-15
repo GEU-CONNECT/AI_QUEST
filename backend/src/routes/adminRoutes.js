@@ -6,7 +6,9 @@ const {
   getSubAdmins,
   getEventOverview,
   getLeaderboard,
-  getLiveMonitor
+  getLiveMonitor,
+  getRecoveryReport,
+  triggerRecovery
 } = require('../controllers/adminController');
 const { protect, requireAdmin, requireSubAdminOrAdmin } = require('../middleware/auth');
 
@@ -16,5 +18,7 @@ router.get('/subadmins', protect, requireAdmin, getSubAdmins);
 router.get('/overview', protect, requireAdmin, getEventOverview);
 router.get('/leaderboard', protect, requireSubAdminOrAdmin, getLeaderboard);
 router.get('/live-monitor', protect, requireAdmin, getLiveMonitor);
+router.get('/recovery-report', protect, requireAdmin, getRecoveryReport);
+router.post('/trigger-recovery', protect, requireAdmin, triggerRecovery);
 
 module.exports = router;

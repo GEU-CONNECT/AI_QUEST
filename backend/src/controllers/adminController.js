@@ -403,12 +403,57 @@ const getLiveMonitor = async (req, res, next) => {
   }
 };
 
+// @desc    Get candidate recovery status report
+// @route   GET /api/admin/recovery-report
+const getRecoveryReport = async (req, res, next) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const reportPath = '/var/www/aiquest/current/recovery-report.json';
+    const localReportPath = path.join(__dirname, '../../recovery-report.json');
+
+    let report = null;
+    if (fs.existsSync(reportPath)) {
+      report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    } else if (fs.existsSync(localReportPath)) {
+      report = JSON.parse(fs.readFileSync(localReportPath, 'utf8'));
+    }
+
+    const currentStudentsCount = await prisma.user.count({ where: { role: 'STUDENT' } });
+
+    res.json({
+      success: true,
+      currentStudentsCount,
+      report
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Trigger candidate recovery manually
+// @route   POST /api/admin/trigger-recovery
+const triggerRecovery = async (req, res, next) => {
+  try {
+    const recoveryScript = require('../../scripts/recover-students');
+    const result = await recoveryScript.main();
+    res.json({
+      success: true,
+      result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStudents,
   exportStudentsExcel,
   getSubAdmins,
   getEventOverview,
   getLeaderboard,
-  getLiveMonitor
+  getLiveMonitor,
+  getRecoveryReport,
+  triggerRecovery
 };
 

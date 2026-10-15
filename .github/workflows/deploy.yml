@@ -29,10 +29,18 @@ jobs:
           exec 200>/var/lock/ec2_build.lock
           flock -x 200
 
-          # 2. Preserve environment variables and database
-          mkdir -p /home/ubuntu/.env_backups /home/ubuntu/.db_backups
+          # 2. Preserve environment variables and database safely with timestamped history
+          mkdir -p /home/ubuntu/.env_backups /home/ubuntu/.db_backups /home/ubuntu/.db_backups_history /home/ubuntu/.db_backups_temp_protect
+          TS=$(date +%Y%m%d_%H%M%S)
+
           [ -f /home/ubuntu/AI_QUEST/backend/.env ] && cp -f /home/ubuntu/AI_QUEST/backend/.env /home/ubuntu/.env_backups/aiquest_backend_env_backup 2>/dev/null || true
-          [ -f /home/ubuntu/AI_QUEST/backend/prisma/dev.db ] && cp -f /home/ubuntu/AI_QUEST/backend/prisma/dev.db /home/ubuntu/.db_backups/aiquest_dev_db_backup 2>/dev/null || true
+
+          # Preserve current live database state before git touches anything
+          if [ -f /home/ubuntu/AI_QUEST/backend/prisma/dev.db ]; then
+            cp -a /home/ubuntu/AI_QUEST/backend/prisma/dev.db* /home/ubuntu/.db_backups_temp_protect/ 2>/dev/null || true
+            mkdir -p /home/ubuntu/.db_backups_history/$TS
+            cp -a /home/ubuntu/AI_QUEST/backend/prisma/dev.db* /home/ubuntu/.db_backups_history/$TS/ 2>/dev/null || true
+          fi
 
           # 3. Update live repo
           cd /home/ubuntu/AI_QUEST
@@ -42,9 +50,14 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          # Restore .env and dev.db if needed
+          # Restore .env and ensure dev.db is in place
           [ ! -f /home/ubuntu/AI_QUEST/backend/.env ] && [ -f /home/ubuntu/.env_backups/aiquest_backend_env_backup ] && cp -f /home/ubuntu/.env_backups/aiquest_backend_env_backup /home/ubuntu/AI_QUEST/backend/.env || true
-          [ ! -f /home/ubuntu/AI_QUEST/backend/prisma/dev.db ] && [ -f /home/ubuntu/.db_backups/aiquest_dev_db_backup ] && cp -f /home/ubuntu/.db_backups/aiquest_dev_db_backup /home/ubuntu/AI_QUEST/backend/prisma/dev.db || true
+          mkdir -p /home/ubuntu/AI_QUEST/backend/prisma
+          if [ -f /home/ubuntu/.db_backups_temp_protect/dev.db ]; then
+            cp -a /home/ubuntu/.db_backups_temp_protect/dev.db* /home/ubuntu/AI_QUEST/backend/prisma/ 2>/dev/null || true
+          elif [ -f /home/ubuntu/.db_backups/aiquest_dev_db_backup ]; then
+            cp -f /home/ubuntu/.db_backups/aiquest_dev_db_backup /home/ubuntu/AI_QUEST/backend/prisma/dev.db 2>/dev/null || true
+          fi
 
           # 4. Setup Database & Backend
           echo "⚙️ Setting up AI Quest Backend (Port 5005)..."
@@ -57,10 +70,16 @@ jobs:
             echo "⚡ Backend dependencies up to date, skipping npm install."
           fi
           nice -n 19 npx prisma generate
+
+          # 5. Run Candidate Recovery & Protection Script
+          echo "🔍 Running Candidate Recovery across all backups, logs, and carvings..."
+          nice -n 19 node scripts/recover-students.js || true
+
+          # Restart backend process
           pm2 reload aiquest-backend || pm2 restart aiquest-backend || pm2 start ecosystem.config.js
           pm2 save
 
-          # 5. Single-pass Frontend build with lowest CPU priority and memory capped
+          # 6. Single-pass Frontend build with lowest CPU priority and memory capped
           echo "🎨 Building AI Quest Frontend (Throttled)..."
           cd /home/ubuntu/AI_QUEST/frontend
           if [ ! -d "node_modules" ] || [ package.json -nt node_modules ]; then
@@ -72,12 +91,13 @@ jobs:
           fi
           nice -n 19 ionice -c 3 env UV_THREADPOOL_SIZE=2 NODE_OPTIONS="--max-old-space-size=1536" npm run build
 
-          # 6. Sync to Web Root
+          # 7. Sync to Web Root
           sudo mkdir -p /var/www/aiquest/current
           sudo cp -rf dist/* /var/www/aiquest/current/
+          [ -f /home/ubuntu/AI_QUEST/backend/recovery-report.json ] && sudo cp -f /home/ubuntu/AI_QUEST/backend/recovery-report.json /var/www/aiquest/current/ 2>/dev/null || true
           sudo chown -R www-data:www-data /var/www/aiquest
 
-          # 7. Verify and reload Nginx
+          # 8. Verify and reload Nginx
           sudo nginx -t && sudo systemctl reload nginx || true
 
           echo "=========================================="
