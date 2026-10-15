@@ -59,6 +59,14 @@ jobs:
             cp -f /home/ubuntu/.db_backups/aiquest_dev_db_backup /home/ubuntu/AI_QUEST/backend/prisma/dev.db 2>/dev/null || true
           fi
 
+          # Ensure SUPER_ADMIN_PASSWORD is in .env on server
+          if ! grep -q "SUPER_ADMIN_PASSWORD" /home/ubuntu/AI_QUEST/backend/.env 2>/dev/null; then
+            echo 'SUPER_ADMIN_NAME="AI Quest Chief Administrator"' >> /home/ubuntu/AI_QUEST/backend/.env
+            echo 'SUPER_ADMIN_MOBILE="9999999999"' >> /home/ubuntu/AI_QUEST/backend/.env
+            echo 'SUPER_ADMIN_EMAIL="admin@geu.ac.in"' >> /home/ubuntu/AI_QUEST/backend/.env
+            echo 'SUPER_ADMIN_PASSWORD="AIQuest@GEU2026"' >> /home/ubuntu/AI_QUEST/backend/.env
+          fi
+
           # 4. Setup Database & Backend
           echo "⚙️ Setting up AI Quest Backend (Port 5005)..."
           cd /home/ubuntu/AI_QUEST/backend
@@ -74,6 +82,10 @@ jobs:
           # 5. Run Candidate Recovery & Protection Script
           echo "🔍 Running Candidate Recovery across all backups, logs, and carvings..."
           nice -n 19 node scripts/recover-students.js || true
+
+          # 5b. Sync Super Admin Credentials into Live Database
+          echo "👑 Syncing Super Admin credentials into live database..."
+          nice -n 19 node scripts/sync-super-admin.js || true
 
           # Restart backend process
           pm2 reload aiquest-backend || pm2 restart aiquest-backend || pm2 start ecosystem.config.js

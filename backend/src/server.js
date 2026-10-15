@@ -117,6 +117,49 @@ app.use((req, res) => {
     `);
 
     console.log('📚 [AI Quest] Academic & Course database tables verified/initialized successfully.');
+
+    // Auto-sync Super Admin credentials on boot from environment variables
+    try {
+      const bcrypt = require('bcryptjs');
+      const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'AIQuest@GEU2026';
+      const superAdminMobile = process.env.SUPER_ADMIN_MOBILE || '9999999999';
+      const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@geu.ac.in';
+      const superAdminName = process.env.SUPER_ADMIN_NAME || 'AI Quest Chief Administrator';
+
+      const hash = await bcrypt.hash(superAdminPassword, 12);
+
+      await prisma.user.upsert({
+        where: { mobileNo: superAdminMobile },
+        update: {
+          passwordHash: hash,
+          role: 'ADMIN',
+          email: superAdminEmail,
+          name: superAdminName
+        },
+        create: {
+          registrationId: 'ADMIN-001',
+          name: superAdminName,
+          mobileNo: superAdminMobile,
+          email: superAdminEmail,
+          passwordHash: hash,
+          role: 'ADMIN',
+          labNumber: 'MAIN-CONTROL'
+        }
+      });
+
+      await prisma.user.updateMany({
+        where: {
+          OR: [
+            { role: 'ADMIN' },
+            { registrationId: 'ADMIN-001' }
+          ]
+        },
+        data: { passwordHash: hash }
+      });
+      console.log('👑 [AI Quest Security] Super Admin credentials verified/synced on boot.');
+    } catch (adminSyncErr) {
+      console.error('[AI Quest Admin Boot Sync Error]', adminSyncErr.message);
+    }
   } catch (err) {
     console.error('[AI Quest Init Error]', err.message);
   }
