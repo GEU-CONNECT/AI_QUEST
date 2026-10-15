@@ -19,8 +19,10 @@ const {
   getLiveMonitor,
   getRecoveryReport,
   triggerRecovery,
-  getExecutiveAudit
+  getExecutiveAudit,
+  resetSystemData
 } = require('../controllers/adminController');
+
 const {
   bulkCreateCourses,
   deleteAllCourses,
@@ -86,5 +88,9 @@ router.get('/recovery-report', protect, requireAdmin, getRecoveryReport);
 router.post('/trigger-recovery', protect, requireAdmin, triggerRecovery);
 router.get('/executive-audit', protect, requireAdmin, getExecutiveAudit);
 
+// System Purge & Clean Slate (Preserves Registered Students & Admin)
+router.post('/reset-system-data', protect, requireAdmin, resetSystemData);
+
 module.exports = router;
+
 

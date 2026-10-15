@@ -1011,6 +1011,56 @@ const exportResultsExcel = async (req, res, next) => {
   }
 };
 
+// @desc    Purge all quizzes, subjects, sub-admins, and submissions while strictly preserving registered students and admin accounts
+// @route   POST /api/admin/reset-system-data
+const resetSystemData = async (req, res, next) => {
+  try {
+    // 1. Delete all submissions
+    const deletedSubmissions = await prisma.quizSubmission.deleteMany();
+
+    // 2. Delete all questions
+    const deletedQuestions = await prisma.question.deleteMany();
+
+    // 3. Delete all quizzes
+    const deletedQuizzes = await prisma.quiz.deleteMany();
+
+    // 4. Delete all subjects/courses
+    const deletedCourses = await prisma.course.deleteMany();
+
+    // 5. Delete all sub-admins and dummy non-student/non-admin users
+    const deletedSubAdmins = await prisma.user.deleteMany({
+      where: {
+        role: {
+          notIn: ['ADMIN', 'STUDENT']
+        }
+      }
+    });
+
+    // 6. Delete all audit logs
+    await prisma.adminAuditLog.deleteMany();
+
+    // Count preserved registered students
+    const preservedStudentsCount = await prisma.user.count({
+      where: { role: 'STUDENT' }
+    });
+
+    res.json({
+      success: true,
+      message: 'System data reset successfully. All dummy quizzes, subjects, and sub-admin accounts have been purged while registered students remain 100% safe.',
+      stats: {
+        deletedQuizzes: deletedQuizzes.count,
+        deletedCourses: deletedCourses.count,
+        deletedSubAdmins: deletedSubAdmins.count,
+        deletedSubmissions: deletedSubmissions.count,
+        deletedQuestions: deletedQuestions.count,
+        preservedStudentsCount
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStudents,
   exportStudentsExcel,
@@ -1030,6 +1080,8 @@ module.exports = {
   getLiveMonitor,
   getRecoveryReport,
   triggerRecovery,
-  getExecutiveAudit
+  getExecutiveAudit,
+  resetSystemData
 };
+
 

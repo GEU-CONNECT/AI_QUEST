@@ -202,7 +202,14 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [isImportingBulk, setIsImportingBulk] = useState(false);
   const [bulkImportMessage, setBulkImportMessage] = useState("");
 
+  // Full System Reset State (Preserves Registered Students & Admin)
+  const [isSystemResetModalOpen, setIsSystemResetModalOpen] = useState(false);
+  const [systemResetConfirmText, setSystemResetConfirmText] = useState("");
+  const [isResettingSystem, setIsResettingSystem] = useState(false);
+  const [systemResetResultMsg, setSystemResetResultMsg] = useState("");
+
   // 7. NAAC / NBA Accreditation Report State
+
   const [accreditationReport, setAccreditationReport] = useState([]);
   const [loadingAccreditation, setLoadingAccreditation] = useState(false);
   const [selectedCourseAccreditation, setSelectedCourseAccreditation] = useState(null);
@@ -1325,7 +1332,38 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     }
   };
 
+  const handleResetSystemData = async () => {
+    if (systemResetConfirmText.trim().toUpperCase() !== "RESET") {
+      alert("Please type RESET in capital letters to confirm system purge.");
+      return;
+    }
+    try {
+      setIsResettingSystem(true);
+      setSystemResetResultMsg("");
+      const res = await api.post("/admin/reset-system-data");
+      if (res.data.success) {
+        setSystemResetResultMsg(res.data.message);
+        await Promise.allSettled([
+          fetchAdminData(),
+          fetchAcademicConfig(),
+          fetchAcademicStructureData()
+        ]);
+        setTimeout(() => {
+          setIsSystemResetModalOpen(false);
+          setSystemResetConfirmText("");
+          setSystemResetResultMsg("");
+          alert(res.data.message);
+        }, 1200);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to reset system data.");
+    } finally {
+      setIsResettingSystem(false);
+    }
+  };
+
   const handleCreateCourse = async (e) => {
+
     e.preventDefault();
     setCourseActionError("");
 
@@ -1420,6 +1458,19 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSystemResetConfirmText("");
+                  setSystemResetResultMsg("");
+                  setIsSystemResetModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Purge dummy quizzes, questions, subjects & sub-admins while keeping registered students safe"
+              >
+                <Trash2 size={13} />
+                <span>Reset System Data</span>
+              </button>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                 Admin Access Active
               </span>
@@ -3690,6 +3741,19 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSystemResetConfirmText("");
+                  setSystemResetResultMsg("");
+                  setIsSystemResetModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Reset dummy sub-admin accounts & quizzes while keeping registered students safe"
+              >
+                <Trash2 size={13} />
+                <span>Reset System Data</span>
+              </button>
               <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[#1c1f58] font-bold text-xs flex items-center gap-1.5">
                 <Users size={14} />
                 <span>{subAdmins.length} Active Sub-Admins</span>
@@ -4078,7 +4142,22 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
       {(activeTab === "quizzes" || (!["students", "courses", "submissions", "create-subadmin", "faculties", "live-monitor", "proctoring-rules", "academic-structure", "create-quiz", "results"].includes(activeTab))) && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-base font-black text-slate-900">All Created Quizzes</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-black text-slate-900">All Created Quizzes</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setSystemResetConfirmText("");
+                  setSystemResetResultMsg("");
+                  setIsSystemResetModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-2xs active:scale-95"
+                title="Reset all dummy quizzes, questions & subjects while keeping registered students safe"
+              >
+                <Trash2 size={12} />
+                <span>Reset All Quizzes & Data</span>
+              </button>
+            </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="relative">
@@ -5844,6 +5923,138 @@ Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
                   return null;
                 })()
               )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* FULL SYSTEM RESET CONFIRMATION MODAL */}
+      {isSystemResetModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-rose-200 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-rose-600 via-rose-700 to-red-800 p-6 text-white relative">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isResettingSystem) {
+                    setIsSystemResetModalOpen(false);
+                    setSystemResetConfirmText("");
+                  }
+                }}
+                disabled={isResettingSystem}
+                className="absolute top-5 right-5 text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center border border-white/20 shrink-0">
+                  <Trash2 size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight">Reset System Data</h3>
+                  <p className="text-xs text-rose-100 font-medium">
+                    Purge dummy quizzes, subjects & sub-admin accounts
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 text-xs">
+              {/* Green Safety Guarantee */}
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
+                <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-black text-emerald-900 text-xs">
+                    Registered Students & Admin Stay 100% Safe
+                  </div>
+                  <div className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed font-medium">
+                    All registered student profiles, login credentials, and your admin account will <b>never</b> be deleted or modified.
+                  </div>
+                </div>
+              </div>
+
+              {/* What will be deleted */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                  The following items will be permanently erased:
+                </div>
+                <ul className="space-y-1.5 text-slate-600 font-medium pl-1">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                    <span>All Quizzes, Questions & Options</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                    <span>All Quiz Submissions & test attempts</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                    <span>All dummy Courses / Subjects</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                    <span>All Sub-Admin accounts created during testing</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Confirmation Input */}
+              <div className="space-y-2 pt-1">
+                <label className="block text-[11px] font-black text-slate-700">
+                  To confirm, please type <span className="text-rose-600 font-black">RESET</span> in capital letters:
+                </label>
+                <input
+                  type="text"
+                  value={systemResetConfirmText}
+                  onChange={(e) => setSystemResetConfirmText(e.target.value)}
+                  placeholder="Type RESET here"
+                  disabled={isResettingSystem}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                />
+              </div>
+
+              {systemResetResultMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl font-bold text-center text-xs">
+                  {systemResetResultMsg}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSystemResetModalOpen(false);
+                  setSystemResetConfirmText("");
+                  setSystemResetResultMsg("");
+                }}
+                disabled={isResettingSystem}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleResetSystemData}
+                disabled={systemResetConfirmText.trim().toUpperCase() !== "RESET" || isResettingSystem}
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-sm transition-all cursor-pointer active:scale-95"
+              >
+                {isResettingSystem ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Purging Data...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Erase Data & Clean Slate</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>,
