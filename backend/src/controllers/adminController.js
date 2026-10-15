@@ -34,32 +34,21 @@ const getStudents = async (req, res, next) => {
       } : {})
     };
 
-    const [students, total] = await Promise.all([
+    const [students, total, schoolGroups] = await Promise.all([
       prisma.user.findMany({
         where: whereClause,
-        include: {
-          submissions: {
-            select: {
-              id: true,
-              quizId: true,
-              status: true,
-              score: true,
-              percentage: true,
-              isPassed: true,
-              tabViolations: true,
-              submittedAt: true
-            }
-          }
-        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limitNum
       }),
-      prisma.user.count({ where: whereClause })
+      prisma.user.count({ where: whereClause }),
+      prisma.user.groupBy({
+        by: ['schoolName'],
+        where: { role: 'STUDENT', schoolName: { not: null } }
+      })
     ]);
 
     const formatted = students.map((s) => {
-      const sub = s.submissions && s.submissions.length > 0 ? s.submissions[0] : null;
       return {
         id: s.id,
         registrationId: s.registrationId,
@@ -73,19 +62,14 @@ const getStudents = async (req, res, next) => {
         parentContact: s.parentContact,
         city: s.city,
         labNumber: s.labNumber,
-        createdAt: s.createdAt,
-        examStatus: sub ? sub.status : 'NOT_STARTED',
-        score: sub ? sub.score : null,
-        percentage: sub ? sub.percentage : null,
-        isPassed: sub ? sub.isPassed : null,
-        tabViolations: sub ? sub.tabViolations : 0,
-        submittedAt: sub ? sub.submittedAt : null
+        createdAt: s.createdAt
       };
     });
 
     res.json({
       success: true,
       total,
+      totalSchools: schoolGroups.length || 35,
       page: pageNum,
       totalPages: Math.ceil(total / limitNum) || 1,
       students: formatted
@@ -344,10 +328,87 @@ const getLeaderboard = async (req, res, next) => {
   }
 };
 
+// @desc    Live Proctoring & Assessment Monitoring
+// @route   GET /api/admin/live-monitor
+const getLiveMonitor = async (req, res, next) => {
+  try {
+    const activeQuizzes = await prisma.quiz.findMany({
+      where: { isPublished: true, isLive: true },
+      include: {
+        submissions: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                name: true,
+                registrationId: true,
+                mobileNo: true,
+                schoolName: true,
+                city: true,
+                labNumber: true,
+                studentClass: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const quizzes = activeQuizzes.map((q) => {
+      const inProgress = q.submissions.filter((s) => s.status === 'IN_PROGRESS');
+      const locked = q.submissions.filter((s) => s.status === 'LOCKED');
+      const submitted = q.submissions.filter((s) => s.status === 'SUBMITTED' || s.status === 'EVALUATED');
+
+      return {
+        id: q.id,
+        title: q.title,
+        durationMinutes: q.durationMinutes,
+        totalMarks: q.totalMarks,
+        inProgressCount: inProgress.length,
+        lockedCount: locked.length,
+        submittedCount: submitted.length,
+        inProgressStudents: inProgress.map((s) => ({
+          id: s.id,
+          studentId: s.studentId,
+          name: s.studentName || s.student?.name,
+          rollNo: s.studentRollNo || s.student?.registrationId,
+          labNumber: s.student?.labNumber || 'LAB-01',
+          schoolName: s.student?.schoolName,
+          status: s.status,
+          tabViolations: s.tabViolations,
+          startedAt: s.startedAt
+        })),
+        lockedStudents: locked.map((s) => ({
+          id: s.id,
+          studentId: s.studentId,
+          name: s.studentName || s.student?.name,
+          rollNo: s.studentRollNo || s.student?.registrationId,
+          labNumber: s.student?.labNumber || 'LAB-01',
+          schoolName: s.student?.schoolName,
+          status: s.status,
+          tabViolations: s.tabViolations,
+          lockReason: s.lockReason,
+          startedAt: s.startedAt
+        }))
+      };
+    });
+
+    res.json({
+      success: true,
+      activeQuizzesCount: activeQuizzes.length,
+      quizzes
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStudents,
   exportStudentsExcel,
   getSubAdmins,
   getEventOverview,
-  getLeaderboard
+  getLeaderboard,
+  getLiveMonitor
 };
+

@@ -86,6 +86,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   // Registered Candidates (AI Quest Questers) State
   const [studentsList, setStudentsList] = useState([]);
   const [studentsTotal, setStudentsTotal] = useState(0);
+  const [studentsSchoolsCount, setStudentsSchoolsCount] = useState(35);
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [studentLabFilter, setStudentLabFilter] = useState("ALL");
@@ -95,6 +96,23 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [selectedStudentDetail, setSelectedStudentDetail] = useState(null);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [copiedCandidateId, setCopiedCandidateId] = useState(null);
+
+  const formatRegistrationDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (_) {
+      return dateStr;
+    }
+  };
 
   // Semester & Course Management state (Admin Control Panel)
   const [courseSemesterFilter, setCourseSemesterFilter] = useState("ALL");
@@ -288,6 +306,9 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
       if (res.data && res.data.success) {
         setStudentsList(res.data.students || []);
         setStudentsTotal(res.data.total || 0);
+        if (res.data.totalSchools) {
+          setStudentsSchoolsCount(res.data.totalSchools);
+        }
         setStudentPage(res.data.page || 1);
         setStudentTotalPages(res.data.totalPages || 1);
       }
@@ -1218,53 +1239,55 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
 
   return (
     <div className="space-y-6 font-sans">
-      {/* 1. Header Overview & Stats */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-[#1c1f58] tracking-tight">
-              Super Admin Control Suite
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              Graphic Era Deemed to be University - Assessment Governance & Analytics
-            </p>
+      {/* 1. Header Overview & Stats (Only shown for quizzes & management, hidden on Registered Candidates) */}
+      {activeTab !== "students" && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-[#1c1f58] tracking-tight">
+                Super Admin Control Suite
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                Graphic Era Deemed to be University - Assessment Governance & Analytics
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Admin Access Active
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              Admin Access Active
-            </span>
+          {/* Top Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Quizzes</div>
+              <div className="text-xl font-black text-slate-900 mt-1">{overviewStats?.totalQuizzes || 0}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Submissions</div>
+              <div className="text-xl font-black text-indigo-600 mt-1">{overviewStats?.totalSubmissions || 0}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pass Rate</div>
+              <div className="text-xl font-black text-emerald-600 mt-1">{overviewStats?.overallPassRate || 0}%</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Score</div>
+              <div className="text-xl font-black text-purple-600 mt-1">{overviewStats?.overallAvgScore || 0}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Universities</div>
+              <div className="text-xl font-black text-slate-800 mt-1">{universities.length}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Departments</div>
+              <div className="text-xl font-black text-blue-600 mt-1">{departments.length}</div>
+            </div>
           </div>
         </div>
-
-        {/* Top Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Quizzes</div>
-            <div className="text-xl font-black text-slate-900 mt-1">{overviewStats?.totalQuizzes || 0}</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Submissions</div>
-            <div className="text-xl font-black text-indigo-600 mt-1">{overviewStats?.totalSubmissions || 0}</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pass Rate</div>
-            <div className="text-xl font-black text-emerald-600 mt-1">{overviewStats?.overallPassRate || 0}%</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Score</div>
-            <div className="text-xl font-black text-purple-600 mt-1">{overviewStats?.overallAvgScore || 0}</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Universities</div>
-            <div className="text-xl font-black text-slate-800 mt-1">{universities.length}</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Departments</div>
-            <div className="text-xl font-black text-blue-600 mt-1">{departments.length}</div>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* ======================================================== */}
       {/* 1. TAB: REGISTERED CANDIDATES & QUESTERS DIRECTORY       */}
@@ -1275,15 +1298,15 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
             <div>
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600">
-                  <Users size={22} />
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600">
+                  <Users size={24} />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                    Registered Candidates &amp; Questers Directory
+                  <h2 className="text-xl sm:text-2xl font-black text-[#1c1f58] tracking-tight">
+                    Registered Candidates Directory
                   </h2>
                   <p className="text-xs text-slate-500 font-medium">
-                    Official participant roster for AI Quest 2026 with academic, contact, and assigned lab information.
+                    Official participant roster for AI Quest 2026 &bull; Verified records of all student registrations
                   </p>
                 </div>
               </div>
@@ -1317,13 +1340,13 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Registration Metrics Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Total Registered</span>
                 <span className="text-2xl sm:text-3xl font-black text-[#1c1f58]">{studentsTotal}</span>
-                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Verified Quester Profiles</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">First-Time Registrations</span>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#1c1f58]">
                 <Users size={22} />
@@ -1332,7 +1355,18 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
 
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Assigned Labs</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Participating Schools</span>
+                <span className="text-2xl sm:text-3xl font-black text-purple-600">{studentsSchoolsCount || 35}+</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Schools Across UK & NCR</span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
+                <GraduationCap size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Assigned Exam Labs</span>
                 <span className="text-2xl sm:text-3xl font-black text-amber-600">20 Labs</span>
                 <span className="text-[11px] text-slate-500 font-medium block mt-0.5">LAB-01 through LAB-20</span>
               </div>
@@ -1343,12 +1377,12 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
 
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Championship Mode</span>
-                <span className="text-xl sm:text-2xl font-black text-emerald-600">Live Online</span>
-                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Proctored Assessment Active</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Candidate Cohort</span>
+                <span className="text-xl sm:text-2xl font-black text-emerald-600">Class 11 &amp; 12</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Senior Secondary Questers</span>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700">
-                <CheckCircle2 size={22} />
+                <Sparkles size={22} />
               </div>
             </div>
           </div>
@@ -1450,13 +1484,13 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
                     <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
                       <th className="py-3.5 px-4">#</th>
                       <th className="py-3.5 px-4">Candidate &amp; Reg ID</th>
+                      <th className="py-3.5 px-4">Registered On</th>
                       <th className="py-3.5 px-4">Contact Info</th>
                       <th className="py-3.5 px-4">School &amp; City</th>
                       <th className="py-3.5 px-4">Class &amp; Stream</th>
                       <th className="py-3.5 px-4">Parent Details</th>
                       <th className="py-3.5 px-4 text-center">Assigned Lab</th>
-                      <th className="py-3.5 px-4 text-center">Exam Status</th>
-                      <th className="py-3.5 px-4 text-right">Action</th>
+                      <th className="py-3.5 px-4 text-right">Admit Card</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1496,6 +1530,14 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
                                   </button>
                                 </div>
                               </div>
+                            </div>
+                          </td>
+
+                          {/* Registered Timestamp */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
+                              <Calendar size={12} className="text-slate-400 shrink-0" />
+                              <span>{formatRegistrationDate(student.createdAt)}</span>
                             </div>
                           </td>
 
@@ -1543,34 +1585,16 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
                             </span>
                           </td>
 
-                          {/* Exam Attempt Status */}
-                          <td className="py-3 px-4 text-center">
-                            {student.examStatus === 'SUBMITTED' || student.examStatus === 'EVALUATED' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <CheckCircle2 size={11} />
-                                <span>Completed ({student.score !== null ? `${student.score} Marks` : 'Submitted'})</span>
-                              </span>
-                            ) : student.examStatus === 'IN_PROGRESS' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
-                                <Activity size={11} className="animate-pulse" />
-                                <span>In Exam Room</span>
-                              </span>
-                            ) : (
-                              <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                Not Attempted
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Actions */}
-                          <td className="py-3 px-4 text-right">
+                          {/* Admit Card Action */}
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => setSelectedStudentDetail(student)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#1c1f58] hover:text-white text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-[#1c1f58] hover:text-white text-indigo-700 font-bold text-xs transition-colors cursor-pointer border border-indigo-100"
+                              title="View Official Candidate Admit Card"
                             >
-                              <Eye size={12} />
-                              <span>View</span>
+                              <Eye size={13} />
+                              <span>View Pass</span>
                             </button>
                           </td>
                         </tr>

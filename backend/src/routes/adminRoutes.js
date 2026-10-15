@@ -5,7 +5,8 @@ const {
   exportStudentsExcel,
   getSubAdmins,
   getEventOverview,
-  getLeaderboard
+  getLeaderboard,
+  getLiveMonitor
 } = require('../controllers/adminController');
 const { protect, requireAdmin, requireSubAdminOrAdmin } = require('../middleware/auth');
 
@@ -14,5 +15,6 @@ router.get('/export/students', protect, requireAdmin, exportStudentsExcel);
 router.get('/subadmins', protect, requireAdmin, getSubAdmins);
 router.get('/overview', protect, requireAdmin, getEventOverview);
 router.get('/leaderboard', protect, requireSubAdminOrAdmin, getLeaderboard);
+router.get('/live-monitor', protect, requireAdmin, getLiveMonitor);
 
 module.exports = router;
