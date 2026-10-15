@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThreeCanvas from '../components/ThreeCanvas';
-import Navbar from '../components/Navbar';
 import QuesterForm from '../components/QuesterForm';
 import LoginForm from '../components/LoginForm';
 import SuccessModal from '../components/SuccessModal';
@@ -87,8 +86,6 @@ export default function AuthLanding({ onLoginSuccess }) {
 
       {/* Main Foreground Container */}
       <div className="app-foreground-content">
-        <Navbar />
-
         <main className="main-content-layout">
           {/* Top Hero Banner Section */}
           <section className="hero-banner-section">
@@ -155,18 +152,14 @@ export default function AuthLanding({ onLoginSuccess }) {
         {/* Global Footer */}
         <footer className="global-site-footer">
           <div className="footer-content">
-            <div className="footer-geu-info">
-              <span className="footer-brand">Graphic Era University</span>
-              <p className="footer-address">
-                Graphic Era University, 566/6, Bell Road, Society Area, Clement Town, Dehradun, Uttarakhand 248002
-              </p>
-              <p className="footer-sub-text">
-                Graphic Era University Admissions & AI Quest 2026 Secretariat
-              </p>
+            <div className="footer-spacer-left" aria-hidden="true" />
+
+            <div className="footer-center-brand">
+              <span className="footer-deemed-title">Graphic Era Deemed to be University</span>
             </div>
 
-            {/* Toggle Button */}
-            <div className="footer-login-center-block">
+            {/* Right: Login / Register Button */}
+            <div className="footer-login-right-block">
               {activeTab === 'register' ? (
                 <button
                   type="button"
@@ -196,11 +189,6 @@ export default function AuthLanding({ onLoginSuccess }) {
                   <span>Register</span>
                 </button>
               )}
-            </div>
-
-            <div className="footer-meta">
-              <p>© 2026 Graphic Era University. All Rights Reserved.</p>
-              <p className="footer-sub">Graphic Era University • AI Quest 2026 • Northern India Championship</p>
             </div>
           </div>
         </footer>
