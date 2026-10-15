@@ -687,9 +687,9 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
               >
                 <div className="label-with-quick">
                   <label htmlFor="city">
-                    City / District <span className="req-star">*</span>
+                    City <span className="req-star">*</span>
                   </label>
-                  <span className="field-hint">Select below or type your city</span>
+                  <span className="field-hint">e.g. Dehradun, Haridwar, Roorkee</span>
                 </div>
 
                 <div className="input-wrap">
@@ -699,7 +699,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     type="text"
                     name="city"
                     list="city-options-datalist"
-                    placeholder="Click to select or enter city (e.g. Dehradun, Haridwar, Roorkee, Delhi NCR...)"
+                    placeholder="Enter city (e.g. Dehradun, Haridwar, Roorkee, Delhi NCR)"
                     value={formData.city}
                     onChange={handleChange}
                     onFocus={() => handleFocus('city')}
@@ -732,36 +732,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                   ) : isCityValid ? (
                     <CheckCircle2 size={18} className="field-valid-icon" />
                   ) : null}
-                </div>
-
-                {/* Prominent Quick-Select Pills Bar */}
-                <div className="quick-city-selector-bar">
-                  <span className="quick-select-tag-title">⚡ Quick Select City:</span>
-                  <div className="quick-city-tags-grid">
-                    {POPULAR_CITIES.map((c) => {
-                      const isSelected =
-                        (formData.city || '').trim().toLowerCase() === c.toLowerCase();
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          className={`city-pill ${isSelected ? 'active' : ''}`}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                          }}
-                          onClick={() => {
-                            sound.playPop();
-                            setFormData((prev) => ({ ...prev, city: c }));
-                            validateField('city', c);
-                            setTouched((prev) => ({ ...prev, city: true }));
-                          }}
-                        >
-                          {isSelected && <Check size={12} className="city-check-icon" />}
-                          <span>{c}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
 
                 {touched.city && errors.city && (
