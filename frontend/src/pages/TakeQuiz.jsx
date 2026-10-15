@@ -2323,16 +2323,6 @@ const TakeQuiz = ({ user }) => {
       {/* 1. Exam Top Bar */}
       <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sticky top-0 z-40 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (window.confirm('Do you want to leave? Your test progress will be lost unless submitted.')) {
-                navigate('/');
-              }
-            }}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <ArrowLeft size={18} />
-          </button>
           <div>
             <h1 className="text-xs sm:text-sm font-extrabold text-slate-900 line-clamp-1">{quiz.title}</h1>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
