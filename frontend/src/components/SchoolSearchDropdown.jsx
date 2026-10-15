@@ -35,6 +35,8 @@ export const SCHOOL_LIST = [
   'Jaswant Modern Sr Sec School, Dehradun',
   'Stone Ridge International School, Rudrapur',
   'SGRR',
+  'SGRR, Vasant Vihar',
+  'SGRR, Talab',
   'The Heritage School, Dehradun',
   'Olympus High School, Dehradun',
   'Roorkee Public School, Roorkee',
