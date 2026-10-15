@@ -125,3 +125,42 @@ model ProctoringRule {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
+
+model Course {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  title        String
+  semester     Int      @default(1)
+  department   String   @default("CSE")
+  universityId String?
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([code])
+  @@index([semester])
+  @@index([department])
+}
+
+model University {
+  id          String       @id @default(uuid())
+  name        String
+  code        String       @unique
+  createdAt   DateTime     @default(now())
+  departments Department[]
+
+  @@index([code])
+}
+
+model Department {
+  id           String      @id @default(uuid())
+  name         String
+  code         String
+  universityId String?
+  university   University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+
+  @@index([code])
+  @@index([universityId])
+}
+

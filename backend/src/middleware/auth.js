@@ -21,9 +21,17 @@ const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.userId || decoded.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token structure.'
+      });
+    }
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId }
+      where: { id: userId }
     });
+
 
     if (!user) {
       return res.status(401).json({

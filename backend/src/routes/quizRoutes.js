@@ -10,6 +10,7 @@ const {
   createQuiz
 } = require('../controllers/quizController');
 const { recordViolation } = require('../controllers/proctoringController');
+const { getAcademicMap, getAcademicStudents } = require('../controllers/academicController');
 const { protect, requireAdmin } = require('../middleware/auth');
 const prisma = require('../config/db');
 
@@ -33,9 +34,12 @@ const getProctoringRules = async (req, res, next) => {
 };
 
 router.get('/proctoring-rules', protect, getProctoringRules);
+router.get('/academic-map', protect, getAcademicMap);
+router.get('/academic/students', protect, getAcademicStudents);
 router.get('/', protect, listQuizzes);
 router.post('/', protect, requireAdmin, createQuiz);
 router.get('/:id', protect, getQuiz);
+
 router.get('/:id/session-status', protect, getSessionStatus);
 router.post('/:id/record-violation', protect, recordViolation);
 router.post('/:id/verify-access', protect, verifyAccessCode);

@@ -21,8 +21,38 @@ const {
   triggerRecovery,
   getExecutiveAudit
 } = require('../controllers/adminController');
+const {
+  bulkCreateCourses,
+  deleteAllCourses,
+  getCourseAccreditation
+} = require('../controllers/courseController');
+const {
+  getAcademicTerm,
+  updateAcademicTerm,
+  getUniversities,
+  createUniversity,
+  deleteUniversity,
+  getDepartments,
+  createDepartment,
+  deleteDepartment
+} = require('../controllers/academicController');
 const { listQuizzes } = require('../controllers/quizController');
 const { protect, requireAdmin, requireSubAdminOrAdmin } = require('../middleware/auth');
+
+// Academic Term & Structure Management
+router.get('/academic-term', protect, requireAdmin, getAcademicTerm);
+router.put('/academic-term', protect, requireAdmin, updateAcademicTerm);
+router.get('/universities', protect, requireAdmin, getUniversities);
+router.post('/universities', protect, requireAdmin, createUniversity);
+router.delete('/universities/:id', protect, requireAdmin, deleteUniversity);
+router.get('/departments', protect, requireAdmin, getDepartments);
+router.post('/departments', protect, requireAdmin, createDepartment);
+router.delete('/departments/:id', protect, requireAdmin, deleteDepartment);
+
+// Course Catalog Management & Accreditation Dossier
+router.post('/courses/bulk', protect, requireAdmin, bulkCreateCourses);
+router.delete('/courses/all', protect, requireAdmin, deleteAllCourses);
+router.get('/accreditation/courses/:id', protect, requireAdmin, getCourseAccreditation);
 
 // Quizzes alias for Admin
 router.get('/quizzes', protect, requireAdmin, listQuizzes);
@@ -57,3 +87,4 @@ router.post('/trigger-recovery', protect, requireAdmin, triggerRecovery);
 router.get('/executive-audit', protect, requireAdmin, getExecutiveAudit);
 
 module.exports = router;
+

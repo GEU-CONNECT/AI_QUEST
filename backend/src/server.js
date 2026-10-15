@@ -7,6 +7,8 @@ const authRoutes = require('./routes/authRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const proctoringRoutes = require('./routes/proctoringRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const courseRoutes = require('./routes/courseRoutes');
+const { getAcademicConfig } = require('./controllers/academicController');
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -42,21 +44,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/proctoring', proctoringRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/courses', courseRoutes);
 
-// Fallback compatibility route for courses and academic config
-app.get('/api/courses', (req, res) => {
-  res.json({ success: true, courses: [] });
-});
-
-app.get('/api/academic/config', (req, res) => {
-  res.json({
-    success: true,
-    academicTerm: { termType: 'ODD', academicYear: '2026-2027', activeSemesters: [1, 3, 5, 7] },
-    activeSemesters: [1, 3, 5, 7],
-    universities: [],
-    departments: []
-  });
-});
+// Dynamic academic config route
+app.get('/api/academic/config', getAcademicConfig);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
@@ -76,7 +67,7 @@ app.use((req, res) => {
   });
 });
 
-// Ensure activeSessionId column exists in SQLite User table safely
+// Ensure activeSessionId column and database tables exist in SQLite safely on boot
 (async () => {
   try {
     const prisma = require('./config/db');
@@ -86,10 +77,51 @@ app.use((req, res) => {
       await prisma.$queryRawUnsafe(`ALTER TABLE "User" ADD COLUMN "activeSessionId" TEXT`);
       console.log('🔒 [AI Quest Security] Single-device activeSessionId column initialized successfully.');
     }
+
+    // Auto-create Course table if not exists
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Course" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "code" TEXT NOT NULL,
+        "title" TEXT NOT NULL,
+        "semester" INTEGER NOT NULL DEFAULT 1,
+        "department" TEXT NOT NULL DEFAULT 'CSE',
+        "universityId" TEXT,
+        "description" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Course_code_key" ON "Course"("code");`);
+
+    // Auto-create University & Department tables if not exists
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "University" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "name" TEXT NOT NULL,
+        "code" TEXT NOT NULL,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "University_code_key" ON "University"("code");`);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Department" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "name" TEXT NOT NULL,
+        "code" TEXT NOT NULL,
+        "universityId" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY ("universityId") REFERENCES "University" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+      );
+    `);
+
+    console.log('📚 [AI Quest] Academic & Course database tables verified/initialized successfully.');
   } catch (err) {
-    // Column already exists or non-sqlite provider
+    console.error('[AI Quest Init Error]', err.message);
   }
 })();
+
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
