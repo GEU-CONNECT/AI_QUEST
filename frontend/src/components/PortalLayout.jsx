@@ -85,13 +85,14 @@ const PortalLayout = ({
 
   if (isAdmin) {
     navItems.push(
+      { id: 'students', name: 'Registered Candidates', icon: <Users size={18} /> },
       { id: 'quizzes', name: 'All Quizzes', icon: <CheckSquare size={18} /> },
       { id: 'question-vault', name: 'Question Vault', icon: <Archive size={18} /> },
       { id: 'live-monitor', name: 'Live Monitor', icon: <Activity size={18} /> },
       { id: 'proctoring-rules', name: 'Proctoring Rules', icon: <ShieldAlert size={18} /> },
       { id: 'courses', name: 'Subjects', icon: <BookOpen size={18} /> },
       { id: 'submissions', name: 'Submissions', icon: <FileText size={18} /> },
-      { id: 'faculties', name: 'Faculties', icon: <Users size={18} /> },
+      { id: 'faculties', name: 'Lab Sub-Admins', icon: <Building2 size={18} /> },
       { id: 'accreditation', name: 'NAAC / NBA Audit', icon: <Award size={18} /> },
       { id: 'audit-logs', name: 'Audit Trail', icon: <Shield size={18} /> },
       { id: 'academic-structure', name: 'Academic Setup', icon: <Building2 size={18} /> }

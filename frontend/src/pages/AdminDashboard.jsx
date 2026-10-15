@@ -41,7 +41,12 @@ import {
   Building2,
   Calendar,
   Check,
-  ChevronRight
+  ChevronRight,
+  Phone,
+  Mail,
+  MapPin,
+  Copy,
+  Filter
 } from "lucide-react";
 import api from "../api/client";
 import CreateQuizView from "../components/CreateQuizView";
@@ -77,6 +82,19 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [facultyFilter, setFacultyFilter] = useState("ALL");
   const [courseFilter, setCourseFilter] = useState("ALL");
   const [submissionSearch, setSubmissionSearch] = useState("");
+
+  // Registered Candidates (AI Quest Questers) State
+  const [studentsList, setStudentsList] = useState([]);
+  const [studentsTotal, setStudentsTotal] = useState(0);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentLabFilter, setStudentLabFilter] = useState("ALL");
+  const [studentClassFilter, setStudentClassFilter] = useState("ALL");
+  const [studentPage, setStudentPage] = useState(1);
+  const [studentTotalPages, setStudentTotalPages] = useState(1);
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState(null);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [copiedCandidateId, setCopiedCandidateId] = useState(null);
 
   // Semester & Course Management state (Admin Control Panel)
   const [courseSemesterFilter, setCourseSemesterFilter] = useState("ALL");
@@ -255,9 +273,64 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     fetchAcademicConfig();
   }, []);
 
+  // Registered Candidates (Questers) API Fetcher
+  const fetchRegisteredStudents = async (page = 1, currentSearch = studentSearch, currentLab = studentLabFilter, currentClass = studentClassFilter) => {
+    try {
+      setStudentsLoading(true);
+      const params = new URLSearchParams();
+      if (currentSearch && currentSearch.trim()) params.append('search', currentSearch.trim());
+      if (currentLab && currentLab !== 'ALL') params.append('labNumber', currentLab);
+      if (currentClass && currentClass !== 'ALL') params.append('studentClass', currentClass);
+      params.append('page', page);
+      params.append('limit', 25);
+
+      const res = await api.get(`/admin/students?${params.toString()}`);
+      if (res.data && res.data.success) {
+        setStudentsList(res.data.students || []);
+        setStudentsTotal(res.data.total || 0);
+        setStudentPage(res.data.page || 1);
+        setStudentTotalPages(res.data.totalPages || 1);
+      }
+    } catch (err) {
+      console.error('Failed to fetch registered students', err);
+    } finally {
+      setStudentsLoading(false);
+    }
+  };
+
+  // Export Registered Candidates to Excel Sheet
+  const handleExportStudentsExcel = async () => {
+    try {
+      setIsExportingExcel(true);
+      const token = localStorage.getItem('quizx_token');
+      const response = await fetch('/api/admin/export/students', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `AI_Quest_2026_Registered_Candidates_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export students excel', err);
+      alert('Failed to export registered students to Excel.');
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
   // Fetch contextual tab data when activeTab changes
   useEffect(() => {
-    if (activeTab === "live-monitor") {
+    if (activeTab === "students") {
+      fetchRegisteredStudents(1);
+    } else if (activeTab === "live-monitor") {
       fetchLiveMonitorData();
       fetchAcademicConfig();
     } else if (activeTab === "proctoring-rules") {
@@ -271,6 +344,16 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
       fetchAcademicStructureData();
     }
   }, [activeTab]);
+
+  // Debounced search & filter effect for registered students
+  useEffect(() => {
+    if (activeTab === "students") {
+      const timer = setTimeout(() => {
+        fetchRegisteredStudents(1, studentSearch, studentLabFilter, studentClassFilter);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [studentSearch, studentLabFilter, studentClassFilter]);
 
   const fetchAcademicConfig = async () => {
     try {
@@ -1182,6 +1265,450 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
           </div>
         </div>
       </div>
+
+      {/* ======================================================== */}
+      {/* 1. TAB: REGISTERED CANDIDATES & QUESTERS DIRECTORY       */}
+      {/* ======================================================== */}
+      {activeTab === "students" && (
+        <div className="space-y-6">
+          {/* Header Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600">
+                  <Users size={22} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                    Registered Candidates &amp; Questers Directory
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Official participant roster for AI Quest 2026 with academic, contact, and assigned lab information.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleExportStudentsExcel}
+                disabled={isExportingExcel}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50 active:scale-95"
+                title="Download full candidate list as Microsoft Excel sheet"
+              >
+                {isExportingExcel ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <FileSpreadsheet size={15} />
+                )}
+                <span>{isExportingExcel ? 'Exporting Sheet...' : 'Export Excel (.xlsx)'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fetchRegisteredStudents(studentPage)}
+                disabled={studentsLoading}
+                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+                title="Refresh candidate records"
+              >
+                <RefreshCw size={15} className={studentsLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Total Registered</span>
+                <span className="text-2xl sm:text-3xl font-black text-[#1c1f58]">{studentsTotal}</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Verified Quester Profiles</span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#1c1f58]">
+                <Users size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Assigned Labs</span>
+                <span className="text-2xl sm:text-3xl font-black text-amber-600">20 Labs</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">LAB-01 through LAB-20</span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700">
+                <Building2 size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Championship Mode</span>
+                <span className="text-xl sm:text-2xl font-black text-emerald-600">Live Online</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Proctored Assessment Active</span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700">
+                <CheckCircle2 size={22} />
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Toolbar */}
+          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
+            {/* Search Input */}
+            <div className="relative w-full md:w-96">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search candidate name, mobile, reg ID, school, city..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1c1f58] focus:bg-white transition-all"
+              />
+              {studentSearch && (
+                <button
+                  type="button"
+                  onClick={() => setStudentSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Dropdowns */}
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+              {/* Lab Filter */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase">Lab:</span>
+                <select
+                  value={studentLabFilter}
+                  onChange={(e) => setStudentLabFilter(e.target.value)}
+                  className="py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
+                >
+                  <option value="ALL">All Labs (20 Labs)</option>
+                  {Array.from({ length: 20 }, (_, i) => {
+                    const labId = `LAB-${String(i + 1).padStart(2, '0')}`;
+                    return <option key={labId} value={labId}>{labId}</option>;
+                  })}
+                </select>
+              </div>
+
+              {/* Class Filter */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase">Class:</span>
+                <select
+                  value={studentClassFilter}
+                  onChange={(e) => setStudentClassFilter(e.target.value)}
+                  className="py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
+                >
+                  <option value="ALL">All Classes</option>
+                  <option value="Class 11th">Class 11th</option>
+                  <option value="Class 12th">Class 12th</option>
+                  <option value="12th Pass / Dropper">12th Pass / Dropper</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {(studentSearch || studentLabFilter !== 'ALL' || studentClassFilter !== 'ALL') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStudentSearch('');
+                    setStudentLabFilter('ALL');
+                    setStudentClassFilter('ALL');
+                  }}
+                  className="text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Candidates Roster Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+            {studentsLoading ? (
+              <div className="p-16 text-center space-y-3">
+                <Loader2 size={32} className="animate-spin text-[#1c1f58] mx-auto" />
+                <span className="text-xs font-bold text-slate-400">Loading registered quester profiles...</span>
+              </div>
+            ) : studentsList.length === 0 ? (
+              <div className="p-16 text-center space-y-3">
+                <Users size={40} className="text-slate-300 mx-auto" />
+                <h3 className="text-sm font-bold text-slate-700">No Candidates Found</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {studentSearch || studentLabFilter !== 'ALL' || studentClassFilter !== 'ALL'
+                    ? "No student records match the active search/filters. Try clearing filters."
+                    : "No candidates have registered yet. Candidates will appear here as they register on the portal."}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                      <th className="py-3.5 px-4">#</th>
+                      <th className="py-3.5 px-4">Candidate &amp; Reg ID</th>
+                      <th className="py-3.5 px-4">Contact Info</th>
+                      <th className="py-3.5 px-4">School &amp; City</th>
+                      <th className="py-3.5 px-4">Class &amp; Stream</th>
+                      <th className="py-3.5 px-4">Parent Details</th>
+                      <th className="py-3.5 px-4 text-center">Assigned Lab</th>
+                      <th className="py-3.5 px-4 text-center">Exam Status</th>
+                      <th className="py-3.5 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {studentsList.map((student, idx) => {
+                      const rowNum = (studentPage - 1) * 25 + idx + 1;
+                      const isCopied = copiedCandidateId === student.registrationId;
+
+                      return (
+                        <tr key={student.id || idx} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-400">{rowNum}</td>
+
+                          {/* Candidate Name & ID */}
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-[#fbc02d] text-[#1c1f58] font-black flex items-center justify-center shrink-0 text-xs">
+                                {(student.name || 'U').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-slate-900 text-xs">{student.name}</div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/80 px-1.5 py-0.2 rounded">
+                                    {student.registrationId || 'N/A'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (student.registrationId) {
+                                        navigator.clipboard.writeText(student.registrationId);
+                                        setCopiedCandidateId(student.registrationId);
+                                        setTimeout(() => setCopiedCandidateId(null), 1800);
+                                      }
+                                    }}
+                                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                                    title="Copy Registration ID"
+                                  >
+                                    {isCopied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Contact */}
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-800 flex items-center gap-1">
+                              <Phone size={11} className="text-slate-400 shrink-0" />
+                              <span>{student.mobileNo}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate max-w-[160px]" title={student.email}>
+                              <Mail size={11} className="text-slate-400 shrink-0" />
+                              <span className="truncate">{student.email}</span>
+                            </div>
+                          </td>
+
+                          {/* School & City */}
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-800 truncate max-w-[180px]" title={student.schoolName}>
+                              {student.schoolName || 'N/A'}
+                            </div>
+                            <div className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
+                              <MapPin size={10} className="text-slate-400 shrink-0" />
+                              <span>{student.city || 'Dehradun'}</span>
+                            </div>
+                          </td>
+
+                          {/* Class & Stream */}
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-800">{student.studentClass || 'Class 12th'}</div>
+                            <div className="text-[10px] text-slate-500 truncate max-w-[140px]" title={student.stream}>
+                              {student.stream || 'Science'}
+                            </div>
+                          </td>
+
+                          {/* Parent Details */}
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-800">{student.parentName || 'N/A'}</div>
+                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">{student.parentContact || 'N/A'}</div>
+                          </td>
+
+                          {/* Assigned Lab */}
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 text-amber-900 border border-amber-200">
+                              {student.labNumber || 'LAB-01'}
+                            </span>
+                          </td>
+
+                          {/* Exam Attempt Status */}
+                          <td className="py-3 px-4 text-center">
+                            {student.examStatus === 'SUBMITTED' || student.examStatus === 'EVALUATED' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 size={11} />
+                                <span>Completed ({student.score !== null ? `${student.score} Marks` : 'Submitted'})</span>
+                              </span>
+                            ) : student.examStatus === 'IN_PROGRESS' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
+                                <Activity size={11} className="animate-pulse" />
+                                <span>In Exam Room</span>
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                Not Attempted
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentDetail(student)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#1c1f58] hover:text-white text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                            >
+                              <Eye size={12} />
+                              <span>View</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination Row */}
+            {studentsTotal > 0 && (
+              <div className="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-semibold">
+                <div>
+                  Showing page <span className="font-bold text-slate-800">{studentPage}</span> of <span className="font-bold text-slate-800">{studentTotalPages}</span> ({studentsTotal} total quester candidates)
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (studentPage > 1) {
+                        const newP = studentPage - 1;
+                        setStudentPage(newP);
+                        fetchRegisteredStudents(newP);
+                      }
+                    }}
+                    disabled={studentPage <= 1 || studentsLoading}
+                    className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (studentPage < studentTotalPages) {
+                        const newP = studentPage + 1;
+                        setStudentPage(newP);
+                        fetchRegisteredStudents(newP);
+                      }
+                    }}
+                    disabled={studentPage >= studentTotalPages || studentsLoading}
+                    className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Candidate Detailed View Modal */}
+          {selectedStudentDetail && createPortal(
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
+                      <Users size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">Official Candidate Admit Profile</h3>
+                      <p className="text-[11px] text-slate-500">AI Quest 2026 Verified Registration</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudentDetail(null)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5 text-xs">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Candidate Name</span>
+                    <span className="font-black text-slate-900 text-sm">{selectedStudentDetail.name}</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Registration ID</span>
+                    <span className="font-mono font-black text-[#1c1f58] text-sm">{selectedStudentDetail.registrationId}</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Mobile Number</span>
+                    <span className="font-bold text-slate-900">{selectedStudentDetail.mobileNo}</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Email Address</span>
+                    <span className="font-medium text-slate-900 truncate block">{selectedStudentDetail.email}</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Class &amp; Stream</span>
+                    <span className="font-bold text-slate-900">{selectedStudentDetail.studentClass} • {selectedStudentDetail.stream}</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Assigned Lab</span>
+                    <span className="font-black text-amber-700 text-sm">{selectedStudentDetail.labNumber}</span>
+                  </div>
+
+                  <div className="col-span-2 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">School / Institution</span>
+                    <span className="font-bold text-slate-900">{selectedStudentDetail.schoolName}</span>
+                    <span className="text-[11px] text-slate-500 font-medium block mt-0.5">City: {selectedStudentDetail.city}</span>
+                  </div>
+
+                  <div className="col-span-2 p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Parent / Guardian</span>
+                      <span className="font-bold text-slate-900">{selectedStudentDetail.parentName || 'N/A'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Parent Contact</span>
+                      <span className="font-mono font-bold text-slate-900">{selectedStudentDetail.parentContact || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudentDetail(null)}
+                    className="px-5 py-2 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    Close Window
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+        </div>
+      )}
 
       {/* 2. TAB: ACADEMIC STRUCTURE & HIERARCHY SETUP */}
       {activeTab === "academic-structure" && (
@@ -2996,7 +3523,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
       )}
 
       {/* 9. TAB: ALL QUIZZES (Default) */}
-      {(activeTab === "quizzes" || (!["courses", "submissions", "faculties", "live-monitor", "proctoring-rules", "accreditation", "audit-logs", "academic-structure", "question-vault"].includes(activeTab))) && (
+      {(activeTab === "quizzes" || (!["students", "courses", "submissions", "faculties", "live-monitor", "proctoring-rules", "accreditation", "audit-logs", "academic-structure", "question-vault"].includes(activeTab))) && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-base font-black text-slate-900">All Created Quizzes</h2>
