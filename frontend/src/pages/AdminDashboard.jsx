@@ -89,16 +89,12 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   const [studentsSchoolsCount, setStudentsSchoolsCount] = useState(35);
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
-  const [studentLabFilter, setStudentLabFilter] = useState("ALL");
   const [studentClassFilter, setStudentClassFilter] = useState("ALL");
   const [studentPage, setStudentPage] = useState(1);
   const [studentTotalPages, setStudentTotalPages] = useState(1);
   const [selectedStudentDetail, setSelectedStudentDetail] = useState(null);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [copiedCandidateId, setCopiedCandidateId] = useState(null);
-  const [showExecutiveModal, setShowExecutiveModal] = useState(false);
-  const [executiveAudit, setExecutiveAudit] = useState(null);
-  const [executiveAuditLoading, setExecutiveAuditLoading] = useState(false);
 
   const formatRegistrationDate = (dateStr) => {
     if (!dateStr) return 'N/A';
@@ -295,12 +291,11 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   }, []);
 
   // Registered Candidates (Questers) API Fetcher
-  const fetchRegisteredStudents = async (page = 1, currentSearch = studentSearch, currentLab = studentLabFilter, currentClass = studentClassFilter) => {
+  const fetchRegisteredStudents = async (page = 1, currentSearch = studentSearch, currentClass = studentClassFilter) => {
     try {
       setStudentsLoading(true);
       const params = new URLSearchParams();
       if (currentSearch && currentSearch.trim()) params.append('search', currentSearch.trim());
-      if (currentLab && currentLab !== 'ALL') params.append('labNumber', currentLab);
       if (currentClass && currentClass !== 'ALL') params.append('studentClass', currentClass);
       params.append('page', page);
       params.append('limit', 25);
@@ -337,7 +332,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `AI_Quest_2026_Registered_Candidates_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = `AI_Quest_2026_Registered_Students_${new Date().toISOString().slice(0, 10)}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -350,26 +345,10 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
     }
   };
 
-  // Fetch Non-Technical Executive Audit for CTO / Leadership
-  const fetchExecutiveAudit = async () => {
-    try {
-      setExecutiveAuditLoading(true);
-      const res = await api.get('/admin/executive-audit');
-      if (res.data && res.data.success) {
-        setExecutiveAudit(res.data.executiveSummary);
-      }
-    } catch (err) {
-      console.error('Failed to fetch executive audit', err);
-    } finally {
-      setExecutiveAuditLoading(false);
-    }
-  };
-
   // Fetch contextual tab data when activeTab changes
   useEffect(() => {
     if (activeTab === "students") {
       fetchRegisteredStudents(1);
-      fetchExecutiveAudit();
     } else if (activeTab === "live-monitor") {
       fetchLiveMonitorData();
       fetchAcademicConfig();
@@ -389,11 +368,11 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
   useEffect(() => {
     if (activeTab === "students") {
       const timer = setTimeout(() => {
-        fetchRegisteredStudents(1, studentSearch, studentLabFilter, studentClassFilter);
+        fetchRegisteredStudents(1, studentSearch, studentClassFilter);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [studentSearch, studentLabFilter, studentClassFilter]);
+  }, [studentSearch, studentClassFilter]);
 
   const fetchAcademicConfig = async () => {
     try {
@@ -1334,89 +1313,27 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
             <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => {
-                  fetchExecutiveAudit();
-                  setShowExecutiveModal(true);
-                }}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1c1f58] hover:bg-indigo-950 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 border border-indigo-700/50"
-                title="Open official CTO / Executive Telemetry Audit Report"
-              >
-                <Activity size={15} className="text-amber-400 animate-pulse" />
-                <span>CTO Audit Report</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={handleExportStudentsExcel}
                 disabled={isExportingExcel}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50 active:scale-95"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50 active:scale-95"
                 title="Download full candidate list as Microsoft Excel sheet"
               >
                 {isExportingExcel ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <FileSpreadsheet size={15} />
+                  <FileSpreadsheet size={16} />
                 )}
                 <span>{isExportingExcel ? 'Exporting Sheet...' : 'Export Excel (.xlsx)'}</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  fetchRegisteredStudents(studentPage);
-                  fetchExecutiveAudit();
-                }}
+                onClick={() => fetchRegisteredStudents(studentPage)}
                 disabled={studentsLoading}
-                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+                className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
                 title="Refresh candidate records"
               >
-                <RefreshCw size={15} className={studentsLoading ? 'animate-spin' : ''} />
-              </button>
-            </div>
-          </div>
-
-          {/* CTO Executive Telemetry Banner */}
-          <div className="bg-gradient-to-r from-[#1c1f58] via-indigo-950 to-slate-900 text-white p-4 sm:p-5 rounded-2xl shadow-sm border border-indigo-500/20 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-start sm:items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center text-amber-300 shrink-0">
-                <ShieldCheck size={22} />
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-amber-300">CTO Executive Traffic Audit</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping mr-1"></span>
-                    Verified Live
-                  </span>
-                  <span className="text-[11px] text-indigo-300 font-medium">aiquest.pblgeu.online</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs">
-                  <span>
-                    Total Inbound Requests: <strong className="text-white font-bold">{executiveAudit?.telemetry?.totalInboundRegistrationRequests || '600+'}</strong>
-                  </span>
-                  <span className="text-indigo-400">•</span>
-                  <span>
-                    Verified Successful (201): <strong className="text-emerald-300 font-bold">{executiveAudit?.telemetry?.verifiedSuccessfulRegistrations || '480+'}</strong>
-                  </span>
-                  <span className="text-indigo-400">•</span>
-                  <span>
-                    Active Roster: <strong className="text-amber-300 font-bold">{studentsTotal} students</strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  fetchExecutiveAudit();
-                  setShowExecutiveModal(true);
-                }}
-                className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-sm flex items-center gap-2 cursor-pointer active:scale-95"
-              >
-                <FileText size={15} />
-                <span>View CTO Audit Report</span>
+                <RefreshCw size={16} className={studentsLoading ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -1427,7 +1344,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Total Registered</span>
                 <span className="text-2xl sm:text-3xl font-black text-[#1c1f58]">{studentsTotal}</span>
-                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">First-Time Registrations</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Verified Student Registrations</span>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#1c1f58]">
                 <Users size={22} />
@@ -1438,21 +1355,10 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Participating Schools</span>
                 <span className="text-2xl sm:text-3xl font-black text-purple-600">{studentsSchoolsCount || 35}+</span>
-                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Schools Across UK & NCR</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Institutions Across UK &amp; NCR</span>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
                 <GraduationCap size={22} />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Assigned Exam Labs</span>
-                <span className="text-2xl sm:text-3xl font-black text-amber-600">20 Labs</span>
-                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">LAB-01 through LAB-20</span>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700">
-                <Building2 size={22} />
               </div>
             </div>
 
@@ -1466,6 +1372,17 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
                 <Sparkles size={22} />
               </div>
             </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Academic Streams</span>
+                <span className="text-xl sm:text-2xl font-black text-amber-600">Science &amp; Tech</span>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">PCM, PCB, CS &amp; Others</span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700">
+                <Layers size={22} />
+              </div>
+            </div>
           </div>
 
           {/* Search & Filter Toolbar */}
@@ -1475,41 +1392,24 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search candidate name, mobile, reg ID, school, city..."
+                placeholder="Search candidate name, mobile, email, school, city..."
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1c1f58] focus:bg-white transition-all"
+                className="w-full pl-10 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1c1f58] focus:bg-white transition-all"
               />
               {studentSearch && (
                 <button
                   type="button"
                   onClick={() => setStudentSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X size={14} />
                 </button>
               )}
             </div>
 
-            {/* Filter Dropdowns */}
-            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-              {/* Lab Filter */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-400 uppercase">Lab:</span>
-                <select
-                  value={studentLabFilter}
-                  onChange={(e) => setStudentLabFilter(e.target.value)}
-                  className="py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1c1f58]"
-                >
-                  <option value="ALL">All Labs (20 Labs)</option>
-                  {Array.from({ length: 20 }, (_, i) => {
-                    const labId = `LAB-${String(i + 1).padStart(2, '0')}`;
-                    return <option key={labId} value={labId}>{labId}</option>;
-                  })}
-                </select>
-              </div>
-
-              {/* Class Filter */}
+            {/* Filter Dropdown & Status */}
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] font-bold text-slate-400 uppercase">Class:</span>
                 <select
@@ -1525,172 +1425,166 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
                 </select>
               </div>
 
-              {(studentSearch || studentLabFilter !== 'ALL' || studentClassFilter !== 'ALL') && (
+              {(studentSearch || studentClassFilter !== 'ALL') && (
                 <button
                   type="button"
                   onClick={() => {
                     setStudentSearch('');
-                    setStudentLabFilter('ALL');
                     setStudentClassFilter('ALL');
                   }}
-                  className="text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1"
+                  className="text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1 cursor-pointer"
                 >
                   Clear Filters
                 </button>
               )}
+
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">
+                {studentsTotal} Total
+              </span>
             </div>
           </div>
 
-          {/* Candidates Roster Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          {/* Candidates Stack / List View */}
+          <div className="space-y-3">
             {studentsLoading ? (
-              <div className="p-16 text-center space-y-3">
+              <div className="p-16 text-center space-y-3 bg-white rounded-2xl border border-slate-200 shadow-2xs">
                 <Loader2 size={32} className="animate-spin text-[#1c1f58] mx-auto" />
-                <span className="text-xs font-bold text-slate-400">Loading registered quester profiles...</span>
+                <span className="text-xs font-bold text-slate-400 block">Loading registered student profiles...</span>
               </div>
             ) : studentsList.length === 0 ? (
-              <div className="p-16 text-center space-y-3">
+              <div className="p-16 text-center space-y-3 bg-white rounded-2xl border border-slate-200 shadow-2xs">
                 <Users size={40} className="text-slate-300 mx-auto" />
                 <h3 className="text-sm font-bold text-slate-700">No Candidates Found</h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  {studentSearch || studentLabFilter !== 'ALL' || studentClassFilter !== 'ALL'
+                  {studentSearch || studentClassFilter !== 'ALL'
                     ? "No student records match the active search/filters. Try clearing filters."
-                    : "No candidates have registered yet. Candidates will appear here as they register on the portal."}
+                    : "No candidates have registered yet. New student registrations will automatically appear here."}
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                      <th className="py-3.5 px-4">#</th>
-                      <th className="py-3.5 px-4">Candidate &amp; Reg ID</th>
-                      <th className="py-3.5 px-4">Registered On</th>
-                      <th className="py-3.5 px-4">Contact Info</th>
-                      <th className="py-3.5 px-4">School &amp; City</th>
-                      <th className="py-3.5 px-4">Class &amp; Stream</th>
-                      <th className="py-3.5 px-4">Parent Details</th>
-                      <th className="py-3.5 px-4 text-center">Assigned Lab</th>
-                      <th className="py-3.5 px-4 text-right">Admit Card</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {studentsList.map((student, idx) => {
-                      const rowNum = (studentPage - 1) * 25 + idx + 1;
-                      const isCopied = copiedCandidateId === student.registrationId;
+              <div className="space-y-3">
+                {studentsList.map((student, idx) => {
+                  const rowNum = (studentPage - 1) * 25 + idx + 1;
+                  const isCopied = copiedCandidateId === student.registrationId;
 
-                      return (
-                        <tr key={student.id || idx} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3 px-4 font-mono font-bold text-slate-400">{rowNum}</td>
-
-                          {/* Candidate Name & ID */}
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-[#fbc02d] text-[#1c1f58] font-black flex items-center justify-center shrink-0 text-xs">
-                                {(student.name || 'U').charAt(0).toUpperCase()}
+                  return (
+                    <div
+                      key={student.id || idx}
+                      onClick={() => setSelectedStudentDetail(student)}
+                      className="group relative bg-white hover:bg-slate-50/80 rounded-2xl border border-slate-200/90 hover:border-indigo-400 p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-150 cursor-pointer"
+                    >
+                      {/* Top Header Row of Stack Item */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-xs font-black text-slate-400 w-7 shrink-0">#{rowNum}</span>
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1c1f58] to-indigo-800 text-white font-black flex items-center justify-center shrink-0 text-sm shadow-xs">
+                            {(student.name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-black text-slate-900 text-sm sm:text-base group-hover:text-indigo-700 transition-colors">
+                                {student.name}
+                              </h3>
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                {student.studentClass || 'Class 12th'}
+                              </span>
+                              {student.stream && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  {student.stream}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <div className="flex items-center gap-1 font-mono text-[11px] font-bold text-indigo-800 bg-indigo-50/70 px-2 py-0.5 rounded-md border border-indigo-100/70">
+                                <span>{student.registrationId || 'N/A'}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (student.registrationId) {
+                                      navigator.clipboard.writeText(student.registrationId);
+                                      setCopiedCandidateId(student.registrationId);
+                                      setTimeout(() => setCopiedCandidateId(null), 1800);
+                                    }
+                                  }}
+                                  className="text-slate-400 hover:text-indigo-600 ml-1 cursor-pointer"
+                                  title="Copy Registration ID"
+                                >
+                                  {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                                </button>
                               </div>
-                              <div>
-                                <div className="font-extrabold text-slate-900 text-xs">{student.name}</div>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/80 px-1.5 py-0.2 rounded">
-                                    {student.registrationId || 'N/A'}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (student.registrationId) {
-                                        navigator.clipboard.writeText(student.registrationId);
-                                        setCopiedCandidateId(student.registrationId);
-                                        setTimeout(() => setCopiedCandidateId(null), 1800);
-                                      }
-                                    }}
-                                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                                    title="Copy Registration ID"
-                                  >
-                                    {isCopied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
-                                  </button>
-                                </div>
-                              </div>
+                              <span className="text-slate-300">•</span>
+                              <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                                <Calendar size={12} className="text-slate-400 shrink-0" />
+                                {formatRegistrationDate(student.createdAt)}
+                              </span>
                             </div>
-                          </td>
+                          </div>
+                        </div>
 
-                          {/* Registered Timestamp */}
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <div className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
-                              <Calendar size={12} className="text-slate-400 shrink-0" />
-                              <span>{formatRegistrationDate(student.createdAt)}</span>
-                            </div>
-                          </td>
+                        <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 group-hover:text-indigo-800 self-end sm:self-center shrink-0">
+                          <span>View Full Details</span>
+                          <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      </div>
 
-                          {/* Contact */}
-                          <td className="py-3 px-4">
-                            <div className="font-semibold text-slate-800 flex items-center gap-1">
-                              <Phone size={11} className="text-slate-400 shrink-0" />
-                              <span>{student.mobileNo}</span>
-                            </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate max-w-[160px]" title={student.email}>
-                              <Mail size={11} className="text-slate-400 shrink-0" />
-                              <span className="truncate">{student.email}</span>
-                            </div>
-                          </td>
+                      {/* Main Details 3-Column Stack Info */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-3.5 text-xs">
+                        {/* 1. Candidate Contact Information */}
+                        <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100/80 space-y-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Candidate Contact</span>
+                          <div className="flex items-center gap-2 font-bold text-slate-900">
+                            <Phone size={13} className="text-indigo-600 shrink-0" />
+                            <span className="font-mono">{student.mobileNo || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-600 truncate font-medium" title={student.email}>
+                            <Mail size={13} className="text-indigo-600 shrink-0" />
+                            <span className="truncate">{student.email || 'N/A'}</span>
+                          </div>
+                        </div>
 
-                          {/* School & City */}
-                          <td className="py-3 px-4">
-                            <div className="font-semibold text-slate-800 truncate max-w-[180px]" title={student.schoolName}>
-                              {student.schoolName || 'N/A'}
-                            </div>
-                            <div className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
-                              <MapPin size={10} className="text-slate-400 shrink-0" />
-                              <span>{student.city || 'Dehradun'}</span>
-                            </div>
-                          </td>
-
-                          {/* Class & Stream */}
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-slate-800">{student.studentClass || 'Class 12th'}</div>
-                            <div className="text-[10px] text-slate-500 truncate max-w-[140px]" title={student.stream}>
-                              {student.stream || 'Science'}
-                            </div>
-                          </td>
-
-                          {/* Parent Details */}
-                          <td className="py-3 px-4">
-                            <div className="font-semibold text-slate-800">{student.parentName || 'N/A'}</div>
-                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">{student.parentContact || 'N/A'}</div>
-                          </td>
-
-                          {/* Assigned Lab */}
-                          <td className="py-3 px-4 text-center">
-                            <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 text-amber-900 border border-amber-200">
-                              {student.labNumber || 'LAB-01'}
+                        {/* 2. School & City Location */}
+                        <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100/80 space-y-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">School &amp; City</span>
+                          <div className="flex items-center gap-2 font-bold text-slate-900 truncate" title={student.schoolName}>
+                            <Building2 size={13} className="text-purple-600 shrink-0" />
+                            <span className="truncate">{student.schoolName || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-600 font-medium">
+                            <span className="flex items-center gap-1.5">
+                              <MapPin size={13} className="text-rose-500 shrink-0" />
+                              <span>City: <strong className="text-slate-800">{student.city || 'Dehradun'}</strong></span>
                             </span>
-                          </td>
+                            <span className="text-[11px] text-purple-700 font-bold truncate max-w-[120px]" title={student.stream}>
+                              {student.stream || 'Science'}
+                            </span>
+                          </div>
+                        </div>
 
-                          {/* Admit Card Action */}
-                          <td className="py-3 px-4 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedStudentDetail(student)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-[#1c1f58] hover:text-white text-indigo-700 font-bold text-xs transition-colors cursor-pointer border border-indigo-100"
-                              title="View Official Candidate Admit Card"
-                            >
-                              <Eye size={13} />
-                              <span>View Pass</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        {/* 3. Parent / Guardian Information */}
+                        <div className="p-3 rounded-xl bg-slate-50/70 border border-slate-100/80 space-y-1.5 sm:col-span-2 lg:col-span-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Parent / Guardian Details</span>
+                          <div className="flex items-center gap-2 font-bold text-slate-900 truncate" title={student.parentName}>
+                            <Users size={13} className="text-emerald-600 shrink-0" />
+                            <span className="truncate">Name: {student.parentName || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-800 font-mono font-bold">
+                            <Phone size={13} className="text-emerald-600 shrink-0" />
+                            <span>Contact: {student.parentContact || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {/* Pagination Row */}
+            {/* Pagination Controls */}
             {studentsTotal > 0 && (
-              <div className="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-semibold">
+              <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-semibold">
                 <div>
-                  Showing page <span className="font-bold text-slate-800">{studentPage}</span> of <span className="font-bold text-slate-800">{studentTotalPages}</span> ({studentsTotal} total quester candidates)
+                  Showing page <span className="font-bold text-slate-800">{studentPage}</span> of <span className="font-bold text-slate-800">{studentTotalPages}</span> ({studentsTotal} total registered candidates)
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1704,7 +1598,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
                       }
                     }}
                     disabled={studentPage <= 1 || studentsLoading}
-                    className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                   >
                     Previous
                   </button>
@@ -1718,7 +1612,7 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
                       }
                     }}
                     disabled={studentPage >= studentTotalPages || studentsLoading}
-                    className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                   >
                     Next
                   </button>
@@ -1727,223 +1621,191 @@ const AdminDashboard = ({ user, activeTab = "quizzes", onTabChange }) => {
             )}
           </div>
 
-          {/* Candidate Detailed View Modal */}
+          {/* Candidate Detailed Profile Modal */}
           {selectedStudentDetail && createPortal(
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95 duration-150">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
-                      <Users size={20} />
+            <div
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+              onClick={() => setSelectedStudentDetail(null)}
+            >
+              <div
+                className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#1c1f58] to-indigo-800 text-white font-black flex items-center justify-center text-lg shadow-sm">
+                      {(selectedStudentDetail.name || 'U').charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <h3 className="text-base font-black text-slate-900">Official Candidate Admit Profile</h3>
-                      <p className="text-[11px] text-slate-500">AI Quest 2026 Verified Registration</p>
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+                        {selectedStudentDetail.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 font-medium">
+                        Official Registered Candidate Profile &bull; AI Quest 2026
+                      </p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSelectedStudentDetail(null)}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     <X size={18} />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3.5 text-xs">
+                {/* Registration ID Banner */}
+                <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 block">Registration ID</span>
+                    <span className="font-mono font-black text-[#1c1f58] text-sm sm:text-base">{selectedStudentDetail.registrationId}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedStudentDetail.registrationId) {
+                        navigator.clipboard.writeText(selectedStudentDetail.registrationId);
+                        setCopiedCandidateId(selectedStudentDetail.registrationId);
+                        setTimeout(() => setCopiedCandidateId(null), 1800);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {copiedCandidateId === selectedStudentDetail.registrationId ? (
+                      <>
+                        <Check size={13} className="text-emerald-600" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={13} />
+                        <span>Copy ID</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Candidate Full Profile Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                     <span className="text-[10px] font-bold text-slate-400 uppercase block">Candidate Name</span>
-                    <span className="font-black text-slate-900 text-sm">{selectedStudentDetail.name}</span>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Registration ID</span>
-                    <span className="font-mono font-black text-[#1c1f58] text-sm">{selectedStudentDetail.registrationId}</span>
+                    <span className="font-black text-slate-900 text-sm block mt-0.5">{selectedStudentDetail.name}</span>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                     <span className="text-[10px] font-bold text-slate-400 uppercase block">Mobile Number</span>
-                    <span className="font-bold text-slate-900">{selectedStudentDetail.mobileNo}</span>
+                    <a
+                      href={`tel:${selectedStudentDetail.mobileNo}`}
+                      className="font-mono font-bold text-indigo-700 hover:underline flex items-center gap-1.5 mt-0.5 text-sm"
+                    >
+                      <Phone size={13} />
+                      <span>{selectedStudentDetail.mobileNo}</span>
+                    </a>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 sm:col-span-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Email Address</span>
+                    <a
+                      href={`mailto:${selectedStudentDetail.email}`}
+                      className="font-semibold text-slate-900 hover:text-indigo-700 hover:underline flex items-center gap-1.5 mt-0.5 truncate"
+                    >
+                      <Mail size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{selectedStudentDetail.email}</span>
+                    </a>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 sm:col-span-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">School / Institution</span>
+                    <div className="flex items-start gap-1.5 mt-0.5">
+                      <Building2 size={14} className="text-purple-600 shrink-0 mt-0.5" />
+                      <span className="font-bold text-slate-900">{selectedStudentDetail.schoolName || 'N/A'}</span>
+                    </div>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Email Address</span>
-                    <span className="font-medium text-slate-900 truncate block">{selectedStudentDetail.email}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">City</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <MapPin size={13} className="text-rose-500 shrink-0" />
+                      <span className="font-bold text-slate-900">{selectedStudentDetail.city || 'Dehradun'}</span>
+                    </div>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                     <span className="text-[10px] font-bold text-slate-400 uppercase block">Class &amp; Stream</span>
-                    <span className="font-bold text-slate-900">{selectedStudentDetail.studentClass} • {selectedStudentDetail.stream}</span>
+                    <div className="font-bold text-slate-900 mt-0.5">
+                      <span>{selectedStudentDetail.studentClass || 'Class 12th'}</span>
+                      {selectedStudentDetail.stream && (
+                        <span className="text-slate-500 font-semibold block text-[11px] mt-0.5">
+                          Stream: {selectedStudentDetail.stream}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Assigned Lab</span>
-                    <span className="font-black text-amber-700 text-sm">{selectedStudentDetail.labNumber}</span>
-                  </div>
-
-                  <div className="col-span-2 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">School / Institution</span>
-                    <span className="font-bold text-slate-900">{selectedStudentDetail.schoolName}</span>
-                    <span className="text-[11px] text-slate-500 font-medium block mt-0.5">City: {selectedStudentDetail.city}</span>
-                  </div>
-
-                  <div className="col-span-2 p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Parent / Guardian</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Father's / Mother's Name</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Users size={13} className="text-emerald-600 shrink-0" />
                       <span className="font-bold text-slate-900">{selectedStudentDetail.parentName || 'N/A'}</span>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Parent Contact</span>
-                      <span className="font-mono font-bold text-slate-900">{selectedStudentDetail.parentContact || 'N/A'}</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Mother's / Father's Mobile No</span>
+                    <div className="flex items-center gap-1.5 mt-0.5 font-mono font-bold text-slate-900">
+                      <Phone size={13} className="text-emerald-600 shrink-0" />
+                      <span>{selectedStudentDetail.parentContact || 'N/A'}</span>
                     </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 sm:col-span-2 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Registration Timestamp</span>
+                      <span className="font-medium text-slate-700 flex items-center gap-1.5 mt-0.5">
+                        <Calendar size={13} className="text-slate-400" />
+                        {formatRegistrationDate(selectedStudentDetail.createdAt)}
+                      </span>
+                    </div>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      <CheckCircle2 size={12} className="mr-1 text-emerald-600" />
+                      Verified Record
+                    </span>
                   </div>
                 </div>
 
-                <div className="pt-2 flex items-center justify-end">
+                {/* Modal Footer */}
+                <div className="pt-2 flex items-center justify-between gap-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const detailsText = `AI QUEST 2026 CANDIDATE PROFILE:
+Name: ${selectedStudentDetail.name}
+Registration ID: ${selectedStudentDetail.registrationId}
+Mobile: ${selectedStudentDetail.mobileNo}
+Email: ${selectedStudentDetail.email}
+City: ${selectedStudentDetail.city || 'Dehradun'}
+School: ${selectedStudentDetail.schoolName || 'N/A'}
+Class: ${selectedStudentDetail.studentClass || 'Class 12th'}
+Stream: ${selectedStudentDetail.stream || 'Science'}
+Parent Name: ${selectedStudentDetail.parentName || 'N/A'}
+Parent Contact: ${selectedStudentDetail.parentContact || 'N/A'}`;
+                      navigator.clipboard.writeText(detailsText);
+                      alert('Candidate details copied to clipboard!');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Copy size={13} />
+                    <span>Copy Summary</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setSelectedStudentDetail(null)}
-                    className="px-5 py-2 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    className="px-6 py-2 rounded-xl bg-[#1c1f58] hover:bg-[#252975] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
                   >
-                    Close Window
+                    Close
                   </button>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
-
-          {/* Official CTO & Executive Telemetry Audit Modal */}
-          {showExecutiveModal && createPortal(
-            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-150 my-8">
-                {/* Header */}
-                <div className="flex items-start justify-between pb-4 border-b border-slate-100">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-[#1c1f58] text-amber-400 flex items-center justify-center shadow-sm">
-                      <ShieldCheck size={26} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
-                          Official Server Telemetry
-                        </span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-1"></span>
-                          Live Verified
-                        </span>
-                      </div>
-                      <h2 className="text-xl font-black text-slate-900 mt-0.5">AI Quest 2026 Executive Audit Report</h2>
-                      <p className="text-xs text-slate-500">Graphic Era University • Production Ingress Telemetry for CTO &amp; Leadership</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowExecutiveModal(false)}
-                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {/* Key Executive Metrics 4-Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100/80">
-                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">Total Ingress</span>
-                    <span className="text-2xl sm:text-3xl font-black text-[#1c1f58] block mt-1">
-                      {executiveAudit?.telemetry?.totalInboundRegistrationRequests || '602'}+
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-medium">Inbound Registration Attempts</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100/80">
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Verified Success</span>
-                    <span className="text-2xl sm:text-3xl font-black text-emerald-700 block mt-1">
-                      {executiveAudit?.telemetry?.verifiedSuccessfulRegistrations || '480'}+
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-medium">HTTP 201 Created Status</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-100/80">
-                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Active Directory</span>
-                    <span className="text-2xl sm:text-3xl font-black text-amber-800 block mt-1">
-                      {studentsTotal}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-medium">Live Assigned to Labs</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-100/80">
-                    <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block">Schools Count</span>
-                    <span className="text-2xl sm:text-3xl font-black text-purple-700 block mt-1">
-                      {studentsSchoolsCount || 27}+
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-medium">Northern India Cohorts</span>
-                  </div>
-                </div>
-
-                {/* Detailed Executive Briefing Box */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 text-xs leading-relaxed text-slate-700">
-                  <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                    <CheckCircle2 size={16} className="text-emerald-600" />
-                    <span>Executive Verification Statement for CTO</span>
-                  </div>
-                  <p>
-                    This audit confirms that the live registration portal at <strong className="text-slate-900 font-mono">https://aiquest.pblgeu.online</strong> has processed over <strong>{executiveAudit?.telemetry?.totalInboundRegistrationRequests || '600+'}</strong> incoming student submissions across regional secondary schools. Over <strong>{executiveAudit?.telemetry?.verifiedSuccessfulRegistrations || '480+'}</strong> successful registration transactions have been authenticated and logged by the server ingress gateway.
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-[11px]">
-                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
-                      <span className="text-slate-500">Live Server Host:</span>
-                      <span className="font-mono font-bold text-slate-900">aiquest.pblgeu.online</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
-                      <span className="text-slate-500">Allocated Exam Labs:</span>
-                      <span className="font-bold text-slate-900">20 Dedicated Labs (LAB-01 to 20)</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
-                      <span className="text-slate-500">Target Cohort:</span>
-                      <span className="font-bold text-slate-900">Class 11th &amp; 12th Questers</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
-                      <span className="text-slate-500">Security &amp; Backup:</span>
-                      <span className="font-bold text-emerald-700">Automated Protected Pipeline</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions Footer */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fetchExecutiveAudit()}
-                      disabled={executiveAuditLoading}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <RefreshCw size={13} className={executiveAuditLoading ? 'animate-spin' : ''} />
-                      <span>Refresh Telemetry</span>
-                    </button>
-                    <span className="text-[11px] text-slate-400">
-                      Generated at: {formatRegistrationDate(executiveAudit?.generatedAt || new Date().toISOString())}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => window.print()}
-                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Printer size={14} />
-                      <span>Print Summary</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowExecutiveModal(false)}
-                      className="px-5 py-2 rounded-xl bg-[#1c1f58] hover:bg-indigo-900 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                    >
-                      Done
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>,
