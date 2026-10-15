@@ -195,6 +195,7 @@ const TakeQuiz = ({ user }) => {
   const [isFocusLost, setIsFocusLost] = useState(false);
   const hasLeftWindowRef = useRef(false);
   const isInViolationEpisodeRef = useRef(false);
+  const hasExamStartedRef = useRef(false);
   const [isSplitScreenDetected, setIsSplitScreenDetected] = useState(false);
 
   useEffect(() => {
@@ -258,6 +259,9 @@ const TakeQuiz = ({ user }) => {
           });
         }
         setQuiz(qData);
+        if (qData.mySubmission?.startedAt) {
+          hasExamStartedRef.current = true;
+        }
 
         // Fetch active institutional proctoring policies
         try {
@@ -541,8 +545,8 @@ const TakeQuiz = ({ user }) => {
       return;
     }
 
-    // 2. Active Exam Mode Guard: Do not penalize if student has not entered exam fullscreen yet
-    if (!isFullscreenModeRef.current && !isIOSDevice()) {
+    // 2. Active Exam Mode Guard: Do not penalize if student has not started exam yet
+    if (!hasExamStartedRef.current) {
       return;
     }
 
@@ -798,8 +802,8 @@ const TakeQuiz = ({ user }) => {
       // 1. Guard with Grace Period (Must never trigger during startup or transition)
       if (Date.now() < fullscreenGraceRef.current) return;
 
-      // 2. Active Exam Mode Guard: Only active once candidate has actually entered fullscreen exam mode
-      if (!isFullscreenModeRef.current && !isIOSDevice()) return;
+      // 2. Active Exam Mode Guard: Only active once candidate has actually started the exam
+      if (!hasExamStartedRef.current) return;
 
       // A. Check for extension tampering
       const check = checkAndPurgeExtensionTampering(cleanGetters);
@@ -884,8 +888,8 @@ const TakeQuiz = ({ user }) => {
 
     // Standard W3C Page Visibility Event Handler (Capturing phase)
     const handleVisibilityChange = () => {
+      if (!hasExamStartedRef.current) return;
       if (Date.now() < fullscreenGraceRef.current) return;
-      if (!isFullscreenModeRef.current && !isIOSDevice()) return;
 
       const isHidden = queryTrueHidden(cleanGetters);
       if (isHidden) {
@@ -922,10 +926,22 @@ const TakeQuiz = ({ user }) => {
       }, 1500);
     };
 
+    const handleWindowBlur = () => {
+      if (!hasExamStartedRef.current) return;
+      if (Date.now() < fullscreenGraceRef.current) return;
+
+      applyImmediateBlackout(true);
+      setIsFocusLost(true);
+      if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
+        hasLeftWindowRef.current = true;
+        recordFocusViolation("Window focus lost / switched application");
+      }
+    };
+
     // Mobile / iOS Safari App Switch Guard
     const handlePageHide = () => {
+      if (!hasExamStartedRef.current) return;
       if (Date.now() < fullscreenGraceRef.current) return;
-      if (!isFullscreenModeRef.current && !isIOSDevice()) return;
 
       applyImmediateBlackout(true);
       setIsFocusLost(true);
@@ -960,7 +976,7 @@ const TakeQuiz = ({ user }) => {
     };
 
     const handleTouchMove = (e) => {
-      if (!isFullscreenModeRef.current || Date.now() < fullscreenGraceRef.current) return;
+      if (!hasExamStartedRef.current || Date.now() < fullscreenGraceRef.current) return;
       if (!e.touches || e.touches.length === 0) return;
       const touchX = e.touches[0].clientX;
       const touchY = e.touches[0].clientY;
@@ -994,7 +1010,7 @@ const TakeQuiz = ({ user }) => {
         const gap = now - lastWorkerMsgTime;
         lastWorkerMsgTime = now;
 
-        if (isFullscreenModeRef.current && Date.now() > fullscreenGraceRef.current && gap > 3200) {
+        if (hasExamStartedRef.current && Date.now() > fullscreenGraceRef.current && gap > 3200) {
           if (!isSessionLocked && !isSubmitting && !submissionResult) {
             applyImmediateBlackout(true);
             setIsFocusLost(true);
@@ -1030,6 +1046,7 @@ const TakeQuiz = ({ user }) => {
 
     addNative(document, "visibilitychange", handleVisibilityChange, { capture: true, passive: true });
     addNative(window, "visibilitychange", handleVisibilityChange, { capture: true, passive: true });
+    addNative(window, "blur", handleWindowBlur, { capture: true, passive: true });
     addNative(window, "focus", handleWindowFocus, { capture: true, passive: true });
     addNative(window, "pagehide", handlePageHide, { capture: true, passive: true });
     addNative(window, "pageshow", handlePageShow, { capture: true, passive: true });
@@ -1044,6 +1061,7 @@ const TakeQuiz = ({ user }) => {
       }
       removeNative(document, "visibilitychange", handleVisibilityChange, { capture: true });
       removeNative(window, "visibilitychange", handleVisibilityChange, { capture: true });
+      removeNative(window, "blur", handleWindowBlur, { capture: true });
       removeNative(window, "focus", handleWindowFocus, { capture: true });
       removeNative(window, "pagehide", handlePageHide, { capture: true });
       removeNative(window, "pageshow", handlePageShow, { capture: true });
@@ -1275,6 +1293,7 @@ const TakeQuiz = ({ user }) => {
 
       if (isFull) {
         wasInFullscreenRef.current = true;
+        hasExamStartedRef.current = true;
         fullscreenGraceRef.current = Math.max(fullscreenGraceRef.current, Date.now() + 3500);
         hasLeftWindowRef.current = false;
         applyImmediateBlackout(false);
@@ -2263,6 +2282,7 @@ const TakeQuiz = ({ user }) => {
                 try {
                   fullscreenGraceRef.current = Date.now() + 4500;
                   isFullscreenModeRef.current = true;
+                  hasExamStartedRef.current = true;
                   hasLeftWindowRef.current = false;
                   isInViolationEpisodeRef.current = false;
                   applyImmediateBlackout(false);
@@ -2299,7 +2319,9 @@ const TakeQuiz = ({ user }) => {
                   }, 200);
                 } catch (err) {
                   setIsFullscreenMode(true);
+                  isFullscreenModeRef.current = true;
                   wasInFullscreenRef.current = true;
+                  hasExamStartedRef.current = true;
                   fullscreenGraceRef.current = Date.now() + 4500;
                 }
               }}
@@ -2933,6 +2955,7 @@ const TakeQuiz = ({ user }) => {
                   setIsFullscreenMode(true);
                   isFullscreenModeRef.current = true;
                   wasInFullscreenRef.current = true;
+                  hasExamStartedRef.current = true;
                   setTimeout(() => {
                     isInViolationEpisodeRef.current = false;
                   }, 2000);
@@ -2947,6 +2970,7 @@ const TakeQuiz = ({ user }) => {
                   setIsFullscreenMode(true);
                   isFullscreenModeRef.current = true;
                   wasInFullscreenRef.current = true;
+                  hasExamStartedRef.current = true;
                   setTimeout(() => {
                     isInViolationEpisodeRef.current = false;
                   }, 2000);
