@@ -1,15 +1,19 @@
 import React from 'react';
 
-// Graphic Era University Official Logo (Matching PBL standard: /geu-logo.webp)
+// Graphic Era University Official Logo
 export function GraphicEraLogo({ className = '' }) {
   return (
     <div className={`geu-branding-container ${className}`}>
       <div className="geu-official-logo-wrapper">
         <img
-          src="/geu-logo.webp"
-          alt="Graphic Era Deemed to be University, Dehradun"
+          src="/image.png"
+          alt="Graphic Era Deemed to be University"
           className="geu-official-logo-img"
         />
+        <div className="geu-logo-text-block">
+          <span className="geu-logo-title">Graphic Era</span>
+          <span className="geu-logo-subtitle">Deemed to be University</span>
+        </div>
       </div>
     </div>
   );

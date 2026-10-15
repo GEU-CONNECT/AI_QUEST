@@ -40,7 +40,7 @@
   gap: 20px;
 }
 
-/* Graphic Era Official University Logo (Matching PBL standard: /geu-logo.webp) */
+/* Graphic Era Official University Logo */
 .geu-branding-container {
   display: flex;
   align-items: center;
@@ -50,9 +50,9 @@
 .geu-official-logo-wrapper {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
   background: #ffffff;
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 12px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.15);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -64,42 +64,90 @@
 }
 
 .geu-official-logo-img {
-  height: 38px;
-  width: auto;
-  max-width: 220px;
+  height: 44px;
+  width: 44px;
   object-fit: contain;
   display: block;
+  flex-shrink: 0;
+}
+
+.geu-logo-text-block {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: left;
+  line-height: 1.15;
+}
+
+.geu-logo-title {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #a91d22;
+  letter-spacing: -0.2px;
+  text-transform: uppercase;
+}
+
+.geu-logo-subtitle {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
 /* In the Hero Section of the Registration Page - make it prominent and large */
 .hero-geu-logo .geu-official-logo-wrapper {
   padding: 10px 22px;
+  gap: 16px;
   border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 25px rgba(250, 204, 21, 0.25);
 }
 
 .hero-geu-logo .geu-official-logo-img {
-  height: 56px;
-  max-width: 320px;
+  height: 58px;
+  width: 58px;
+}
+
+.hero-geu-logo .geu-logo-title {
+  font-size: 1.45rem;
+}
+
+.hero-geu-logo .geu-logo-subtitle {
+  font-size: 0.78rem;
 }
 
 @media (max-width: 768px) {
   .geu-official-logo-wrapper {
-    padding: 5px 10px;
+    padding: 5px 12px;
+    gap: 8px;
     border-radius: 10px;
   }
   .geu-official-logo-img {
-    height: 30px;
-    max-width: 160px;
+    height: 32px;
+    width: 32px;
+  }
+  .geu-logo-title {
+    font-size: 0.95rem;
+  }
+  .geu-logo-subtitle {
+    font-size: 0.58rem;
   }
   .hero-geu-logo .geu-official-logo-wrapper {
     padding: 8px 16px;
+    gap: 12px;
     border-radius: 14px;
   }
   .hero-geu-logo .geu-official-logo-img {
-    height: 42px;
-    max-width: 230px;
+    height: 44px;
+    width: 44px;
+  }
+  .hero-geu-logo .geu-logo-title {
+    font-size: 1.18rem;
+  }
+  .hero-geu-logo .geu-logo-subtitle {
+    font-size: 0.65rem;
   }
 }
 
@@ -1193,6 +1241,13 @@
   font-size: 0.9rem;
   background: #081238; /* Solid dark row */
   border: 1px solid #102159;
+  user-select: none;
+  position: relative;
+  z-index: 2;
+}
+
+.school-custom-option-item * {
+  pointer-events: none;
 }
 
 .school-custom-option-item:hover {
@@ -1966,10 +2021,15 @@
    ============================================================ */
 .global-site-footer {
   width: 100%;
-  padding: 18px 28px;
-  background: rgba(4, 9, 30, 0.96);
+  padding: 16px 28px;
+  background: rgba(4, 9, 30, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.4);
   margin-top: auto;
+  position: relative;
+  z-index: 20;
 }
 
 .footer-content {
@@ -1981,20 +2041,91 @@
   gap: 16px;
 }
 
-.footer-spacer-left {
-  /* Left invisible balance so the center text stays dead center */
+.footer-left-meta {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.footer-portal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #94a3b8;
+}
+
+.footer-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  animation: footerDotPulse 2s infinite ease-in-out;
+}
+
+@keyframes footerDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
 }
 
 .footer-center-brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   text-align: center;
+}
+
+.footer-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 18px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s ease;
+}
+
+.footer-brand-badge:hover {
+  border-color: rgba(250, 204, 21, 0.4);
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 4px 20px rgba(250, 204, 21, 0.18);
+}
+
+.footer-logo-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.footer-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .footer-deemed-title {
   font-family: var(--font-heading);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 700;
-  color: #e2e8f0;
-  letter-spacing: 0.5px;
+  color: #f1f5f9;
+  letter-spacing: 0.4px;
 }
 
 .footer-login-right-block {
@@ -2009,8 +2140,8 @@
     text-align: center;
     gap: 12px;
   }
-  .footer-spacer-left {
-    display: none;
+  .footer-left-meta {
+    justify-content: center;
   }
   .footer-login-right-block {
     justify-content: center;

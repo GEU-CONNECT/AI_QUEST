@@ -70,7 +70,6 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
       let digits = rawVal.replace(/\D/g, '');
       if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
       else if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
-      else if (digits.length > 10) digits = digits.slice(-10);
       setPhone(digits.slice(0, 10));
     } else {
       // Registration ID or Email (e.g. GEU-AIQ-2026-10001, test@domain.com)
@@ -172,11 +171,6 @@ export default function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
             <h2 className="form-title">
               {loginType === 'student' ? 'Candidate Login' : 'Invigilator & Admin Login'}
             </h2>
-            <p className="form-subtitle">
-              {loginType === 'student'
-                ? 'Sign in to access your AI Quest 2026 examination room and admit pass.'
-                : 'Authorized access for Lab Invigilators and University Administrators.'}
-            </p>
           </div>
 
           {/* Mode Switcher */}

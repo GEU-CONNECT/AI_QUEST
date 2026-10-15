@@ -124,6 +124,29 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
     school.toLowerCase().includes(schoolSearchQuery.toLowerCase().trim())
   );
 
+  // Select a school from the dropdown list
+  const handleSelectSchool = (sch) => {
+    sound.playPop();
+    const parts = sch.split(',');
+    const extractedCity = parts.length > 1 ? parts[parts.length - 1].trim() : '';
+    setFormData((prev) => ({
+      ...prev,
+      schoolName: sch,
+      city: prev.city ? prev.city : extractedCity,
+    }));
+    validateField('schoolName', sch);
+    if (extractedCity) {
+      validateField('city', extractedCity);
+    }
+    setTouched((prev) => ({
+      ...prev,
+      schoolName: true,
+      city: true,
+    }));
+    setIsSchoolDropdownOpen(false);
+    setSchoolSearchQuery('');
+  };
+
   // Switch to custom manual school entry
   const handleSwitchToManual = (customVal = '') => {
     sound.playPop();
@@ -209,12 +232,11 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
     const { name, value } = e.target;
     let cleanVal = value;
 
-    // Numeric sanitize for phone fields
+    // Numeric sanitize for phone fields - strictly 10 digits maximum
     if (name === 'mobileNo' || name === 'parentContact') {
       let digits = value.replace(/\D/g, '');
       if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
       else if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
-      else if (digits.length > 10) digits = digits.slice(-10);
       cleanVal = digits.slice(0, 10);
     }
 
@@ -408,9 +430,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
               GRAPHIC ERA UNIVERSITY • AI QUEST 2026 OFFICIAL REGISTRATION
             </div>
             <h2 className="form-title">Quester Application Form</h2>
-            <p className="form-subtitle">
-              Fill in the details below to generate your official AI Quest 2026 Examination Pass.
-            </p>
           </div>
 
           {/* Action Controls */}
@@ -531,7 +550,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     </span>
                   )}
                 </div>
-                <p>Primary identity, phone, email & city of the applicant</p>
               </div>
             </div>
 
@@ -597,7 +615,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     type="tel"
                     name="mobileNo"
                     placeholder="10-digit mobile number"
-                    maxLength={16}
+                    maxLength={10}
                     value={formData.mobileNo}
                     onChange={handleChange}
                     onFocus={() => handleFocus('mobileNo')}
@@ -720,7 +738,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     </span>
                   )}
                 </div>
-                <p>School institution, class level & academic stream</p>
               </div>
             </div>
 
@@ -845,6 +862,12 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                             placeholder="Search among 35 schools (e.g. Doon, Army, St, Zee)..."
                             value={schoolSearchQuery}
                             onChange={(e) => setSchoolSearchQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && filteredSchools.length > 0) {
+                                e.preventDefault();
+                                handleSelectSchool(filteredSchools[0]);
+                              }
+                            }}
                             className="school-search-field"
                             autoFocus
                           />
@@ -877,26 +900,15 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                                     className={`school-custom-option-item ${
                                       isSelected ? 'is-selected' : ''
                                     }`}
-                                    onClick={() => {
-                                      sound.playPop();
-                                      const parts = sch.split(',');
-                                      const extractedCity = parts.length > 1 ? parts[parts.length - 1].trim() : '';
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        schoolName: sch,
-                                        city: prev.city ? prev.city : extractedCity,
-                                      }));
-                                      validateField('schoolName', sch);
-                                      if (extractedCity) {
-                                        validateField('city', extractedCity);
-                                      }
-                                      setTouched((prev) => ({
-                                        ...prev,
-                                        schoolName: true,
-                                        city: true,
-                                      }));
-                                      setIsSchoolDropdownOpen(false);
-                                      setSchoolSearchQuery('');
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSelectSchool(sch);
+                                    }}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSelectSchool(sch);
                                     }}
                                   >
                                     <div className="school-item-left">
@@ -1062,7 +1074,6 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     </span>
                   )}
                 </div>
-                <p>Parent contact for emergency notifications & verification</p>
               </div>
             </div>
 
@@ -1124,7 +1135,7 @@ export default function QuesterForm({ formData, setFormData, onSubmit, isSubmitt
                     type="tel"
                     name="parentContact"
                     placeholder="10-digit guardian mobile"
-                    maxLength={16}
+                    maxLength={10}
                     value={formData.parentContact}
                     onChange={handleChange}
                     onFocus={() => handleFocus('parentContact')}

@@ -152,10 +152,24 @@ export default function AuthLanding({ onLoginSuccess }) {
         {/* Global Footer */}
         <footer className="global-site-footer">
           <div className="footer-content">
-            <div className="footer-spacer-left" aria-hidden="true" />
+            <div className="footer-left-meta">
+              <div className="footer-portal-pill">
+                <span className="footer-live-dot"></span>
+                <span>AI QUEST 2026</span>
+              </div>
+            </div>
 
             <div className="footer-center-brand">
-              <span className="footer-deemed-title">Graphic Era Deemed to be University</span>
+              <div className="footer-brand-badge">
+                <div className="footer-logo-wrap">
+                  <img
+                    src="/image.png"
+                    alt="Graphic Era University Logo"
+                    className="footer-logo-img"
+                  />
+                </div>
+                <span className="footer-deemed-title">Graphic Era Deemed to be University</span>
+              </div>
             </div>
 
             {/* Right: Login / Register Button */}
