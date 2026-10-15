@@ -856,43 +856,86 @@
   gap: 6px;
 }
 
-.quick-city-tags {
+/* Dedicated Quick City Selector Bar & Pills */
+.quick-city-selector-bar {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.quick-select-tag-title {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quick-city-tags-grid {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   flex-wrap: wrap;
 }
 
-.quick-title {
-  font-size: 0.74rem;
-  color: #cbd5e1;
-  font-weight: 500;
-}
-
 .city-pill {
-  font-size: 0.74rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #e2e8f0;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 5px 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
+  user-select: none;
 }
 
 .city-pill:hover {
-  background: rgba(234, 179, 8, 0.25);
+  background: rgba(250, 204, 21, 0.2);
   color: #fde047;
-  border-color: #facc15;
+  border-color: rgba(250, 204, 21, 0.6);
   transform: translateY(-1px);
 }
 
 .city-pill.active {
   background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
   color: #0b1a54;
+  font-weight: 800;
   border-color: #fef08a;
-  box-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+  box-shadow: 0 4px 12px rgba(250, 204, 21, 0.35);
+}
+
+.city-check-icon {
+  stroke-width: 3;
+}
+
+.city-clear-pill-btn {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 5;
+}
+
+.city-clear-pill-btn:hover {
+  background: rgba(244, 63, 94, 0.3);
+  color: #fb7185;
 }
 
 .school-not-on-list-btn {
