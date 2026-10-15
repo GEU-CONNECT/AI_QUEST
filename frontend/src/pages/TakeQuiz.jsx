@@ -194,6 +194,7 @@ const TakeQuiz = ({ user }) => {
   const wasInFullscreenRef = useRef(false);
   const [isFocusLost, setIsFocusLost] = useState(false);
   const hasLeftWindowRef = useRef(false);
+  const isInViolationEpisodeRef = useRef(false);
   const [isSplitScreenDetected, setIsSplitScreenDetected] = useState(false);
 
   useEffect(() => {
@@ -271,7 +272,15 @@ const TakeQuiz = ({ user }) => {
         // Check if candidate attempt is locked
         const savedViolations = Number(qData.mySubmission?.tabViolations) || 0;
         const localViolations = Number(localStorage.getItem(`quizx_violations_${quizId}`)) || 0;
-        const finalViolations = Math.max(savedViolations, localViolations, violationsRef.current);
+        let finalViolations = savedViolations;
+        if (!qData.mySubmission) {
+          finalViolations = Math.max(localViolations, violationsRef.current);
+        } else if (qData.mySubmission.status === 'IN_PROGRESS' && savedViolations === 0) {
+          finalViolations = 0;
+          try { localStorage.removeItem(`quizx_violations_${quizId}`); } catch (_) {}
+        } else {
+          finalViolations = Math.max(savedViolations, violationsRef.current);
+        }
         violationsRef.current = finalViolations;
         setTabViolations(finalViolations);
         try {
@@ -527,8 +536,26 @@ const TakeQuiz = ({ user }) => {
     }
 
     const now = Date.now();
-    // Debounce to prevent multiple triggers in rapid succession (minimum 600ms)
-    if (now - lastViolationTimeRef.current < 600) return;
+    // 1. Fullscreen Transition / Initial Start Grace: MUST NEVER TRIGGER during startup or transition
+    if (now < fullscreenGraceRef.current) {
+      return;
+    }
+
+    // 2. Active Exam Mode Guard: Do not penalize if student has not entered exam fullscreen yet
+    if (!isFullscreenModeRef.current && !isIOSDevice()) {
+      return;
+    }
+
+    // 3. Debounce: Minimum 2500ms between distinct violation episodes
+    if (now - lastViolationTimeRef.current < 2500) {
+      return;
+    }
+
+    // 4. Incident Deduplication: One single continuous absence/switch = EXACTLY ONE violation
+    if (isInViolationEpisodeRef.current) {
+      return;
+    }
+    isInViolationEpisodeRef.current = true;
     lastViolationTimeRef.current = now;
 
     violationsRef.current += 1;
@@ -750,28 +777,36 @@ const TakeQuiz = ({ user }) => {
     const cleanGetters = getPristineGetters();
     let lostFocusStart = 0;
 
-    // Check & purge immediately on start
-    const initialCheck = checkAndPurgeExtensionTampering(cleanGetters);
-    if (initialCheck.tampered) {
-      applyImmediateBlackout(true);
-      setIsFocusLost(true);
-      if (!hasLeftWindowRef.current) {
-        hasLeftWindowRef.current = true;
-        recordFocusViolation(initialCheck.reason || "Prohibited browser extension detected");
+    // Check & purge immediately on start ONLY if past grace and in exam mode
+    if (Date.now() > fullscreenGraceRef.current && (isFullscreenModeRef.current || isIOSDevice())) {
+      const initialCheck = checkAndPurgeExtensionTampering(cleanGetters);
+      if (initialCheck.tampered) {
+        applyImmediateBlackout(true);
+        setIsFocusLost(true);
+        if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
+          hasLeftWindowRef.current = true;
+          recordFocusViolation(initialCheck.reason || "Prohibited browser extension detected");
+        }
       }
     }
 
-    // High-Frequency (200ms) Independent Proctoring & Integrity Pulse
+    // High-Frequency (250ms) Independent Proctoring & Integrity Pulse
     // Does NOT depend on events (bypasses any extension that called stopImmediatePropagation())!
     const pulseInterval = setInterval(() => {
       if (isSessionLocked || isSubmitting || submissionResult || loading || accessRequired || isClosedError) return;
+
+      // 1. Guard with Grace Period (Must never trigger during startup or transition)
+      if (Date.now() < fullscreenGraceRef.current) return;
+
+      // 2. Active Exam Mode Guard: Only active once candidate has actually entered fullscreen exam mode
+      if (!isFullscreenModeRef.current && !isIOSDevice()) return;
 
       // A. Check for extension tampering
       const check = checkAndPurgeExtensionTampering(cleanGetters);
       if (check.tampered) {
         applyImmediateBlackout(true);
         setIsFocusLost(true);
-        if (!hasLeftWindowRef.current) {
+        if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
           hasLeftWindowRef.current = true;
           recordFocusViolation(check.reason || "Prohibited browser extension detected");
         }
@@ -785,7 +820,7 @@ const TakeQuiz = ({ user }) => {
       if (isActuallyHidden || currentVis === 'hidden') {
         applyImmediateBlackout(true);
         setIsFocusLost(true);
-        if (!hasLeftWindowRef.current) {
+        if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
           hasLeftWindowRef.current = true;
           recordFocusViolation("Tab switch / backgrounded window (Proctoring Shield)");
         }
@@ -793,34 +828,29 @@ const TakeQuiz = ({ user }) => {
       }
 
       // C. True Focus Loss Check (Alt+Tab, multi-monitor click, app switch)
-      // Only active when candidate is inside fullscreen exam mode and past the initial grace period
-      const isExamActive = isFullscreenModeRef.current || isIOSDevice();
-      const pastGrace = Date.now() > fullscreenGraceRef.current;
-
-      if (isExamActive && pastGrace) {
-        const hasFocus = queryTrueHasFocus(cleanGetters);
-        if (!hasFocus) {
-          if (!lostFocusStart) {
-            lostFocusStart = Date.now();
-          } else if (Date.now() - lostFocusStart > 650) {
-            // Sustained focus loss for > 650ms
-            applyImmediateBlackout(true);
-            setIsFocusLost(true);
-            if (!hasLeftWindowRef.current) {
-              hasLeftWindowRef.current = true;
-              recordFocusViolation("Window focus lost (Switched application or external monitor)");
-            }
-          }
-        } else {
-          lostFocusStart = 0;
-          if (hasLeftWindowRef.current && !isActuallyHidden) {
-            hasLeftWindowRef.current = false;
-            applyImmediateBlackout(false);
-            setIsFocusLost(false);
+      const hasFocus = queryTrueHasFocus(cleanGetters);
+      if (!hasFocus) {
+        if (!lostFocusStart) {
+          lostFocusStart = Date.now();
+        } else if (Date.now() - lostFocusStart > 1200) {
+          // Sustained focus loss for > 1200ms
+          applyImmediateBlackout(true);
+          setIsFocusLost(true);
+          if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
+            hasLeftWindowRef.current = true;
+            recordFocusViolation("Window focus lost (Switched application or external monitor)");
           }
         }
       } else {
         lostFocusStart = 0;
+        if (hasLeftWindowRef.current && !isActuallyHidden) {
+          hasLeftWindowRef.current = false;
+          applyImmediateBlackout(false);
+          setIsFocusLost(false);
+          setTimeout(() => {
+            isInViolationEpisodeRef.current = false;
+          }, 1500);
+        }
       }
 
       // D. Neutralize rogue injected DOM elements from cheat extensions
@@ -850,15 +880,18 @@ const TakeQuiz = ({ user }) => {
           }
         });
       } catch (_) {}
-    }, 200);
+    }, 250);
 
     // Standard W3C Page Visibility Event Handler (Capturing phase)
     const handleVisibilityChange = () => {
+      if (Date.now() < fullscreenGraceRef.current) return;
+      if (!isFullscreenModeRef.current && !isIOSDevice()) return;
+
       const isHidden = queryTrueHidden(cleanGetters);
       if (isHidden) {
         applyImmediateBlackout(true);
         setIsFocusLost(true);
-        if (!hasLeftWindowRef.current) {
+        if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
           hasLeftWindowRef.current = true;
           recordFocusViolation("Tab switch / backgrounded window");
         }
@@ -866,6 +899,13 @@ const TakeQuiz = ({ user }) => {
         hasLeftWindowRef.current = false;
         applyImmediateBlackout(false);
         setIsFocusLost(false);
+        setTimeout(() => {
+          try {
+            if (!queryTrueHidden(cleanGetters) && queryTrueHasFocus(cleanGetters)) {
+              isInViolationEpisodeRef.current = false;
+            }
+          } catch (_) {}
+        }, 1500);
       }
     };
 
@@ -873,25 +913,40 @@ const TakeQuiz = ({ user }) => {
       hasLeftWindowRef.current = false;
       applyImmediateBlackout(false);
       setIsFocusLost(false);
+      setTimeout(() => {
+        try {
+          if (!queryTrueHidden(cleanGetters) && queryTrueHasFocus(cleanGetters)) {
+            isInViolationEpisodeRef.current = false;
+          }
+        } catch (_) {}
+      }, 1500);
     };
 
     // Mobile / iOS Safari App Switch Guard
     const handlePageHide = () => {
+      if (Date.now() < fullscreenGraceRef.current) return;
+      if (!isFullscreenModeRef.current && !isIOSDevice()) return;
+
       applyImmediateBlackout(true);
       setIsFocusLost(true);
-      if (!hasLeftWindowRef.current) {
+      if (!hasLeftWindowRef.current && !isInViolationEpisodeRef.current) {
         hasLeftWindowRef.current = true;
         recordFocusViolation("Switched application / backgrounded browser (Mobile/iOS)");
       }
     };
 
-    const handlePageShow = (e) => {
-      if (e.persisted || hasLeftWindowRef.current) {
-        hasLeftWindowRef.current = false;
-        applyImmediateBlackout(false);
-        setIsFocusLost(false);
-        recordFocusViolation("Returned from app switch / backgrounded state (iOS BFCache)");
-      }
+    const handlePageShow = () => {
+      hasLeftWindowRef.current = false;
+      applyImmediateBlackout(false);
+      setIsFocusLost(false);
+      // Notice: We NEVER record a violation on returning to the exam window!
+      setTimeout(() => {
+        try {
+          if (!queryTrueHidden(cleanGetters) && queryTrueHasFocus(cleanGetters)) {
+            isInViolationEpisodeRef.current = false;
+          }
+        } catch (_) {}
+      }, 1500);
     };
 
     // Mobile Edge-Swipe Navigation Interceptor
@@ -1220,10 +1275,14 @@ const TakeQuiz = ({ user }) => {
 
       if (isFull) {
         wasInFullscreenRef.current = true;
-        fullscreenGraceRef.current = Date.now() + 1500;
+        fullscreenGraceRef.current = Math.max(fullscreenGraceRef.current, Date.now() + 3500);
         hasLeftWindowRef.current = false;
         applyImmediateBlackout(false);
         setIsFocusLost(false);
+        setShowViolationWarning(false);
+        setTimeout(() => {
+          isInViolationEpisodeRef.current = false;
+        }, 2000);
         try {
           window.focus();
           document.body?.focus?.();
@@ -1237,9 +1296,10 @@ const TakeQuiz = ({ user }) => {
         const wasInFull = wasInFullscreenRef.current;
         wasInFullscreenRef.current = false;
 
-        // Trigger exit infraction ONLY if candidate was ACTUALLY inside fullscreen mode
+        // Trigger exit infraction ONLY if candidate was ACTUALLY inside fullscreen mode AND not in grace period
         if (
           wasInFull &&
+          Date.now() > fullscreenGraceRef.current &&
           proctoringRules.enforceFullscreen &&
           !loading &&
           !accessRequired &&
@@ -1249,7 +1309,9 @@ const TakeQuiz = ({ user }) => {
         ) {
           applyImmediateBlackout(true);
           setIsFocusLost(true);
-          recordFocusViolation('Exited fullscreen mode');
+          if (!isInViolationEpisodeRef.current) {
+            recordFocusViolation('Exited fullscreen mode');
+          }
         }
       }
     };
@@ -2199,16 +2261,18 @@ const TakeQuiz = ({ user }) => {
               type="button"
               onClick={async () => {
                 try {
-                  fullscreenGraceRef.current = Date.now() + 2000;
-                  wasInFullscreenRef.current = true;
+                  fullscreenGraceRef.current = Date.now() + 4500;
                   isFullscreenModeRef.current = true;
                   hasLeftWindowRef.current = false;
+                  isInViolationEpisodeRef.current = false;
                   applyImmediateBlackout(false);
                   setIsFocusLost(false);
+                  setShowViolationWarning(false);
 
                   if (isIOSDevice()) {
                     window.scrollTo(0, 0);
                     setIsFullscreenMode(true);
+                    wasInFullscreenRef.current = true;
                   } else {
                     if (document.documentElement.requestFullscreen) {
                       await document.documentElement.requestFullscreen();
@@ -2220,6 +2284,7 @@ const TakeQuiz = ({ user }) => {
                       await document.documentElement.msRequestFullscreen();
                     }
                     setIsFullscreenMode(true);
+                    wasInFullscreenRef.current = true;
                   }
                   setTimeout(() => {
                     try {
@@ -2231,10 +2296,11 @@ const TakeQuiz = ({ user }) => {
                         });
                       }
                     } catch (_) {}
-                  }, 100);
+                  }, 200);
                 } catch (err) {
                   setIsFullscreenMode(true);
-                  fullscreenGraceRef.current = Date.now() + 2000;
+                  wasInFullscreenRef.current = true;
+                  fullscreenGraceRef.current = Date.now() + 4500;
                 }
               }}
               className="w-full py-3 px-6 rounded-2xl bg-[#1c1f58] hover:bg-[#252975] text-white font-black text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
@@ -2852,7 +2918,7 @@ const TakeQuiz = ({ user }) => {
                 setIsFocusLost(false);
 
                 try {
-                  fullscreenGraceRef.current = Date.now() + 1500;
+                  fullscreenGraceRef.current = Date.now() + 3500;
                   if (!document.fullscreenElement) {
                     if (document.documentElement.requestFullscreen) {
                       await document.documentElement.requestFullscreen();
@@ -2867,6 +2933,9 @@ const TakeQuiz = ({ user }) => {
                   setIsFullscreenMode(true);
                   isFullscreenModeRef.current = true;
                   wasInFullscreenRef.current = true;
+                  setTimeout(() => {
+                    isInViolationEpisodeRef.current = false;
+                  }, 2000);
                   if (navigator.keyboard && navigator.keyboard.lock) {
                     navigator.keyboard.lock(['Escape', 'MetaLeft', 'MetaRight', 'AltLeft', 'AltRight', 'Tab', 'ContextMenu']).catch(() => {
                       try { navigator.keyboard.lock().catch(() => {}); } catch (_) {}
@@ -2878,6 +2947,9 @@ const TakeQuiz = ({ user }) => {
                   setIsFullscreenMode(true);
                   isFullscreenModeRef.current = true;
                   wasInFullscreenRef.current = true;
+                  setTimeout(() => {
+                    isInViolationEpisodeRef.current = false;
+                  }, 2000);
                 }
               }}
               className="w-full py-2.5 rounded-xl bg-[#1c1f58] hover:bg-[#131540] text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
