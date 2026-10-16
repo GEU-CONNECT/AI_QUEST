@@ -11,6 +11,15 @@ export function GraphicEraLogo({ className = '' }) {
           className="geu-official-logo-img"
         />
       </div>
+
+      {/* University Wordmark */}
+      <div className="geu-text-wrapper text-left select-none">
+        <div className="geu-title text-white">Graphic Era</div>
+        <div className="geu-subtitle text-slate-200">
+          Deemed to be <span className="text-white font-bold">University</span>
+        </div>
+        <div className="geu-location text-slate-400">DEHRADUN</div>
+      </div>
     </div>
   );
 }
