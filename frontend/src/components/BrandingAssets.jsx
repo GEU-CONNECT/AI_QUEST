@@ -4,11 +4,12 @@ import React from 'react';
 export function GraphicEraLogo({ className = '' }) {
   return (
     <div className={`geu-branding-container ${className}`}>
-      <div className="geu-official-logo-wrapper">
+      {/* Official Circular Emblem from public/image.png */}
+      <div className="geu-emblem-wrapper">
         <img
-          src="/geu-logo.webp"
-          alt="Graphic Era Deemed to be University, Dehradun"
-          className="geu-official-logo-img"
+          src="/image.png"
+          alt="Graphic Era Deemed to be University"
+          className="geu-logo-img"
         />
       </div>
 
